@@ -24,6 +24,9 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -32,8 +35,12 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -53,6 +60,7 @@ import com.evastore.app.ui.screens.HomeScreen
 import com.evastore.app.ui.screens.SearchScreen
 import com.evastore.app.ui.screens.SettingsScreen
 import com.evastore.app.ui.theme.EvaStoreTheme
+import java.io.File
 
 private data class Tab(
     val route: String,
@@ -73,11 +81,32 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val crashFile = File(filesDir, "last_crash.txt")
+        val lastCrash = if (crashFile.exists()) crashFile.readText().also { crashFile.delete() } else null
+
         setContent {
             val viewModel: MainViewModel = viewModel()
             val settings by viewModel.settings.collectAsStateWithLifecycle()
 
             EvaStoreTheme(themeMode = settings.themeMode) {
+                var crashText by remember { mutableStateOf(lastCrash) }
+                crashText?.let { trace ->
+                    AlertDialog(
+                        onDismissRequest = { crashText = null },
+                        title = { Text("Отчёт о прошлом сбое") },
+                        text = {
+                            Text(
+                                trace.take(2000),
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.verticalScroll(rememberScrollState())
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { crashText = null }) { Text("Закрыть") }
+                        }
+                    )
+                }
                 EvaStoreApp(viewModel, animationsEnabled = settings.animationsEnabled)
             }
         }

@@ -20,12 +20,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            // Минификация отключена: R8 в release-сборке вызывал краш при запуске.
+            isMinifyEnabled = false
+            isShrinkResources = false
             // Debug-подпись, чтобы APK из CI сразу устанавливался.
             // Для публикации замените на собственный keystore.
             signingConfig = signingConfigs.getByName("debug")
