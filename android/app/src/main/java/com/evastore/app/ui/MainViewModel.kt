@@ -76,6 +76,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private var searchJob: Job? = null
 
+    // ВАЖНО: объявлено ДО init-блока — Kotlin инициализирует поля по порядку,
+    // иначе в init поле ещё null и приложение падает при запуске (NPE).
+    private val _queryFlow = MutableStateFlow("")
+
     init {
         loadFeatured()
         viewModelScope.launch {
@@ -84,8 +88,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
-
-    private val _queryFlow = MutableStateFlow("")
 
     fun loadFeatured() {
         viewModelScope.launch {
