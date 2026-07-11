@@ -23,6 +23,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Отдельный процесс, чтобы экран ошибки пережил остановку основного процесса -->
+        <activity
+            android:name=".CrashActivity"
+            android:exported="false"
+            android:process=":crash"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

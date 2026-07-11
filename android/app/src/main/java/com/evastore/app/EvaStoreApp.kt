@@ -1,11 +1,14 @@
 package com.evastore.app
 
 import android.app.Application
+import android.content.Intent
+import android.os.Process
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import java.io.File
+import kotlin.system.exitProcess
 
 class EvaStoreApp : Application(), ImageLoaderFactory {
 
@@ -13,13 +16,24 @@ class EvaStoreApp : Application(), ImageLoaderFactory {
         super.onCreate()
         // Сохраняем текст любого необработанного краша в файл,
         // чтобы показать его пользователю при следующем запуске.
-        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+        Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
             runCatching {
                 File(filesDir, "last_crash.txt")
                     .writeText(android.util.Log.getStackTraceString(throwable))
             }
-            previousHandler?.uncaughtException(thread, throwable)
+            // Показываем простой экран с текстом ошибки вместо молчаливого вылета.
+            runCatching {
+                val intent = Intent(this, CrashActivity::class.java).apply {
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TASK or
+                            Intent.FLAG_ACTIVITY_NO_ANIMATION
+                    )
+                }
+                startActivity(intent)
+            }
+            Process.killProcess(Process.myPid())
+            exitProcess(1)
         }
     }
 
