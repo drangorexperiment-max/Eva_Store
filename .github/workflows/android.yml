@@ -27,13 +27,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.10.2"
 
-      - name: Build release APK
-        run: gradle -p android :app:assembleRelease --no-daemon
+      # Собираем debug-вариант — тот же проверенный способ, что и в Fallen_App.
+      - name: Build debug APK
+        run: gradle -p android :app:assembleDebug --no-daemon
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/release/*.apk EvaStore.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk EvaStore.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

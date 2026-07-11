@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.EvaStore" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/splash_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
-        <item name="postSplashScreenTheme">@style/Theme.EvaStore.Main</item>
-    </style>
-
-    <style name="Theme.EvaStore.Main" parent="android:Theme.Material.NoActionBar">
+    <!-- Простая тема без библиотеки SplashScreen:
+         core-splashscreen вызывает краш на Xiaomi/MIUI. -->
+    <style name="Theme.EvaStore" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/splash_background</item>
+        <item name="android:statusBarColor">@color/splash_background</item>
+        <item name="android:navigationBarColor">@color/splash_background</item>
     </style>
 </resources>
