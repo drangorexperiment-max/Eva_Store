@@ -2,31 +2,25 @@ package com.evastore.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Brand: глубокий изумрудный + нейтральные + янтарный акцент
-val Emerald = Color(0xFF10B981)
-val EmeraldDark = Color(0xFF059669)
-val EmeraldContainerLight = Color(0xFFD1FAE5)
-val EmeraldContainerDark = Color(0xFF064E3B)
+// Палитра в стиле Google Play: белый, серый, тёмно-серый.
+// Никаких ярких брендовых цветов — акцент делается тёмно-серым.
 
-val Amber = Color(0xFFF59E0B)
-val AmberContainerLight = Color(0xFFFEF3C7)
-val AmberContainerDark = Color(0xFF78350F)
+// Light
+val PlayWhite = Color(0xFFFFFFFF)
+val PlaySurfaceLight = Color(0xFFFFFFFF)
+val PlayContainerLight = Color(0xFFF1F3F4)   // светло-серые карточки/поля
+val PlayContainerHighLight = Color(0xFFE8EAED)
+val PlayDarkGray = Color(0xFF202124)          // почти чёрный текст / кнопки
+val PlayGray = Color(0xFF5F6368)              // вторичный текст
+val PlayOutlineLight = Color(0xFFDADCE0)
 
-// Light neutrals
-val SurfaceLight = Color(0xFFFAFAF9)
-val SurfaceContainerLight = Color(0xFFF1F1EF)
-val SurfaceHighLight = Color(0xFFE9E9E6)
-val OnSurfaceLight = Color(0xFF1C1C1A)
-val OnSurfaceVariantLight = Color(0xFF6B6B66)
-val OutlineLight = Color(0xFFDCDCD8)
-
-// Dark neutrals
-val SurfaceDark = Color(0xFF121212)
-val SurfaceContainerDark = Color(0xFF1B1B1B)
-val SurfaceHighDark = Color(0xFF242424)
-val OnSurfaceDark = Color(0xFFEDEDEA)
-val OnSurfaceVariantDark = Color(0xFF9C9C96)
-val OutlineDark = Color(0xFF33332F)
+// Dark
+val PlaySurfaceDark = Color(0xFF131314)
+val PlayContainerDark = Color(0xFF1E1F20)
+val PlayContainerHighDark = Color(0xFF2D2E30)
+val PlayLightGrayText = Color(0xFFE8EAED)
+val PlayGrayTextDark = Color(0xFF9AA0A6)
+val PlayOutlineDark = Color(0xFF3C4043)
 
 val ErrorColor = Color(0xFFDC2626)
 val ErrorContainerLight = Color(0xFFFEE2E2)

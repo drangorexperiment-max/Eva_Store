@@ -39,6 +39,29 @@ object Http {
             }
         }
 
+    /** Быстрая проверка существования страницы (HEAD, при неудаче — облегчённый GET). */
+    suspend fun exists(url: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder().url(url)
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android 13) EvaStore/1.0")
+                .head()
+                .build()
+            client.newCall(request).await().use { resp ->
+                when {
+                    resp.isSuccessful -> true
+                    // Некоторые серверы не любят HEAD — пробуем GET.
+                    resp.code == 405 || resp.code == 403 -> {
+                        val getReq = Request.Builder().url(url)
+                            .header("User-Agent", "Mozilla/5.0 (Linux; Android 13) EvaStore/1.0")
+                            .build()
+                        client.newCall(getReq).await().use { it.isSuccessful }
+                    }
+                    else -> false
+                }
+            }
+        }.getOrDefault(false)
+    }
+
     suspend fun postJson(url: String, jsonBody: String): String =
         withContext(Dispatchers.IO) {
             val body = jsonBody.toRequestBody("application/json".toMediaType())

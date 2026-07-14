@@ -25,6 +25,7 @@ import com.evastore.app.data.model.DownloadOption
 import com.evastore.app.data.model.SourceType
 import com.evastore.app.data.model.StoreApp
 import com.evastore.app.ui.components.AppIcon
+import com.evastore.app.ui.components.formatBytes
 import com.evastore.app.ui.components.icon
 
 /**
@@ -135,9 +136,16 @@ private fun MarketDownloadRow(option: DownloadOption, onClick: () -> Unit) {
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                val subtitle = buildString {
+                    append(
+                        if (direct) "Скачать APK через Eva Store"
+                        else "Открыть страницу в маркете"
+                    )
+                    formatBytes(option.sizeBytes)?.let { append("  •  $it") }
+                    option.versionName?.let { append("  •  v$it") }
+                }
                 Text(
-                    text = if (direct) "Скачать APK через Eva Store"
-                    else "Открыть страницу в маркете",
+                    text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

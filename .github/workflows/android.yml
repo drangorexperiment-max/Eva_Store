@@ -30,8 +30,12 @@ jobs:
           gradle-version: "8.10.2"
 
       # Собираем debug-вариант — тот же проверенный способ, что и в Fallen_App.
+      # VT_API_KEY — необязательный GitHub-секрет: если задан, ключ VirusTotal
+      # вшивается в сборку и пользователю не нужно вводить его вручную.
       - name: Build debug APK
         run: gradle -p android :app:assembleDebug --no-daemon
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk EvaStore.apk

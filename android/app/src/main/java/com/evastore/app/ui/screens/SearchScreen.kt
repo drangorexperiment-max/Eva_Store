@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -95,12 +96,17 @@ fun SearchScreen(
                 .padding(bottom = 10.dp)
         )
 
-        // Фильтр маркетов
-        Row(
+        // Фильтр маркетов: все прямые источники, прокручиваемый ряд
+        LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(bottom = 10.dp)
         ) {
-            listOf(Market.FDROID, Market.RUSTORE, Market.GITHUB).forEach { market ->
+            items(
+                listOf(
+                    Market.RUSTORE, Market.APKPURE, Market.APTOIDE,
+                    Market.FDROID, Market.GITHUB
+                )
+            ) { market ->
                 FilterChip(
                     selected = market in state.selectedMarkets,
                     onClick = { onToggleMarket(market) },

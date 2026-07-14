@@ -8,7 +8,6 @@ import com.evastore.app.data.sources.FdroidSource
 import com.evastore.app.data.sources.GithubSource
 import com.evastore.app.data.sources.MarketSource
 import com.evastore.app.data.sources.RustoreSource
-import com.evastore.app.data.sources.StorefrontLinks
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
@@ -95,13 +94,9 @@ class CatalogRepository {
             )
         }
 
-        // Добавляем витринные ссылки (Google Play / GetApps / App Store)
-        val merged = byPackage.values.map { app ->
-            app.copy(
-                options = (app.options + StorefrontLinks.optionsFor(app))
-                    .distinctBy { it.market }
-            )
-        }
-        return merged + noPackage
+        // Витринные ссылки (Google Play / GetApps / App Store) добавляются
+        // лениво при открытии карточки — после проверки, что приложение
+        // реально существует в этих маркетах (StorefrontLinks.verifiedOptionsFor).
+        return byPackage.values.toList() + noPackage
     }
 }

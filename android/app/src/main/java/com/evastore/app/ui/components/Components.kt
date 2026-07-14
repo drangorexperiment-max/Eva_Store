@@ -1,8 +1,6 @@
 package com.evastore.app.ui.components
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Android
@@ -19,6 +16,7 @@ import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Shop
 import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material.icons.rounded.PhoneIphone
+import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -35,16 +33,32 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.evastore.app.data.model.Market
 import com.evastore.app.data.model.StoreApp
+import java.util.Locale
 
 val Market.icon: ImageVector
     get() = when (this) {
         Market.FDROID -> Icons.Rounded.Android
         Market.GITHUB -> Icons.Rounded.Code
         Market.RUSTORE -> Icons.Rounded.Storefront
+        Market.APTOIDE -> Icons.Rounded.Widgets
+        Market.APKPURE -> Icons.Rounded.Public
         Market.GETAPPS -> Icons.Rounded.Shop
         Market.GOOGLE_PLAY -> Icons.Rounded.Shop
         Market.APP_STORE -> Icons.Rounded.PhoneIphone
     }
+
+/** Читаемый размер файла: 12 МБ, 1,4 ГБ. */
+fun formatBytes(bytes: Long?): String? {
+    if (bytes == null || bytes <= 0) return null
+    val kb = bytes / 1024.0
+    val mb = kb / 1024.0
+    val gb = mb / 1024.0
+    return when {
+        gb >= 1 -> String.format(Locale("ru"), "%.1f ГБ", gb)
+        mb >= 1 -> String.format(Locale("ru"), "%.0f МБ", mb)
+        else -> String.format(Locale("ru"), "%.0f КБ", kb)
+    }
+}
 
 @Composable
 fun MarketBadge(market: Market, modifier: Modifier = Modifier) {
@@ -52,7 +66,7 @@ fun MarketBadge(market: Market, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(50))
-            .background(color.copy(alpha = 0.12f))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(horizontal = 8.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -66,7 +80,7 @@ fun MarketBadge(market: Market, modifier: Modifier = Modifier) {
         Text(
             text = market.label,
             style = MaterialTheme.typography.labelSmall,
-            color = color
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -80,26 +94,30 @@ fun AppIcon(iconUrl: String?, name: String, size: Int = 56) {
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(size.dp)
-                .clip(RoundedCornerShape(size / 4))
+                .clip(RoundedCornerShape((size * 0.22f).dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
         )
     } else {
         Box(
             modifier = Modifier
                 .size(size.dp)
-                .clip(RoundedCornerShape(size / 4))
-                .background(MaterialTheme.colorScheme.primaryContainer),
+                .clip(RoundedCornerShape((size * 0.22f).dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = name.take(1).uppercase(),
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
 }
 
+/**
+ * Плоский элемент списка в стиле Google Play:
+ * иконка слева, название, вторая строка — маркет и размер.
+ */
 @Composable
 fun AppListItem(
     app: StoreApp,
@@ -108,21 +126,18 @@ fun AppListItem(
 ) {
     Surface(
         onClick = onClick,
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = modifier
-            .fillMaxWidth()
-            .animateContentSize()
+        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             AppIcon(app.iconUrl, app.name)
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
                     text = app.name,
@@ -135,24 +150,26 @@ fun AppListItem(
                     Text(
                         text = app.summary,
                         style = MaterialTheme.typography.bodySmall,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    app.options.take(3).forEach { option ->
-                        MarketBadge(option.market)
-                    }
-                    if (app.options.size > 3) {
-                        Text(
-                            text = "+${app.options.size - 3}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.align(Alignment.CenterVertically)
-                        )
-                    }
-                }
+                val marketsText =
+                    if (app.options.size > 2)
+                        app.options.take(2).joinToString(" · ") { it.market.label } +
+                            " +${app.options.size - 2}"
+                    else
+                        app.options.joinToString(" · ") { it.market.label }
+                val meta = listOfNotNull(marketsText, formatBytes(app.sizeBytes))
+                    .joinToString("  •  ")
+                Text(
+                    text = meta,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

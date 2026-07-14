@@ -16,6 +16,15 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         vectorDrawables { useSupportLibrary = true }
+
+        // Встроенный ключ VirusTotal: берётся из GitHub-секрета VT_API_KEY
+        // при сборке в CI. Если секрет не задан — пустая строка, и приложение
+        // предлагает ввести ключ вручную либо открывает отчёт в браузере.
+        buildConfigField(
+            "String",
+            "VT_API_KEY",
+            "\"${System.getenv("VT_API_KEY") ?: ""}\""
+        )
     }
 
     buildTypes {
@@ -34,7 +43,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
     }

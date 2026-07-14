@@ -4,9 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -15,7 +13,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.RocketLaunch
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -31,7 +28,7 @@ import com.evastore.app.data.model.StoreApp
 import com.evastore.app.ui.HomeUiState
 import com.evastore.app.ui.components.AppIcon
 import com.evastore.app.ui.components.AppListItem
-import com.evastore.app.ui.components.MarketBadge
+import com.evastore.app.ui.components.formatBytes
 
 @Composable
 fun HomeScreen(
@@ -64,56 +61,23 @@ fun HomeScreen(
 
         else -> LazyColumn(
             contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            item(key = "hero") {
-                Surface(
-                    shape = MaterialTheme.shapes.large,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 6.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Rounded.RocketLaunch,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(36.dp)
-                        )
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(
-                                text = "Eva Store",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Text(
-                                text = "Один поиск — все маркеты. Скачивание APK и антивирус-проверка.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                }
-            }
-
             item(key = "featured-title") {
                 Text(
-                    text = "Подборка для вас",
+                    text = "Рекомендуем для вас",
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(vertical = 4.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
                 )
             }
 
             item(key = "featured-row") {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(state.featured.take(10), key = { "f-${it.id}" }) { app ->
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp)
+                ) {
+                    items(state.featured.take(12), key = { "f-${it.id}" }) { app ->
                         FeaturedCard(app = app, onClick = { onAppClick(app) })
                     }
                 }
@@ -121,14 +85,14 @@ fun HomeScreen(
 
             item(key = "all-title") {
                 Text(
-                    text = "Каталог",
+                    text = "Популярные приложения",
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
                 )
             }
 
-            items(state.featured.drop(10), key = { it.id }) { app ->
+            items(state.featured.drop(12), key = { it.id }) { app ->
                 AppListItem(app = app, onClick = { onAppClick(app) })
             }
         }
@@ -139,24 +103,27 @@ fun HomeScreen(
 private fun FeaturedCard(app: StoreApp, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.width(140.dp)
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.width(96.dp)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            AppIcon(app.iconUrl, app.name, size = 64)
+            AppIcon(app.iconUrl, app.name, size = 96)
             Text(
                 text = app.name,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            MarketBadge(app.primaryMarket)
+            formatBytes(app.sizeBytes)?.let { size ->
+                Text(
+                    text = size,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

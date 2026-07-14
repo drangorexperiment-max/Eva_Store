@@ -22,6 +22,7 @@ import com.evastore.app.data.settings.SettingsRepository
 import com.evastore.app.data.sources.FdroidSource
 import com.evastore.app.data.sources.GithubSource
 import com.evastore.app.data.sources.RustoreSource
+import com.evastore.app.data.sources.StorefrontLinks
 import com.evastore.app.ui.theme.ThemeMode
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
@@ -163,13 +164,31 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     loading = false,
                     iconMatches = matches,
                     error = if (matches.isEmpty())
-                        "Похожих икон��к не найдено. Сначала выполните текстовый поиск — это расширит базу сравнения." else null
+                        "Похожих иконок не найдено. Сначала выполните текстовый поиск — это расширит базу сравнения." else null
                 )
             }
         }
     }
 
-    fun openApp(app: StoreApp) { _selectedApp.value = app }
+    fun openApp(app: StoreApp) {
+        _selectedApp.value = app
+        // Лениво проверяем витрины (Google Play / App Store / GetApps):
+        // добавляем только те, где приложение реально существует.
+        viewModelScope.launch {
+            val verified = runCatching { StorefrontLinks.verifiedOptionsFor(app) }
+                .getOrDefault(emptyList())
+            if (verified.isNotEmpty()) {
+                _selectedApp.update { current ->
+                    if (current?.id == app.id)
+                        current.copy(
+                            options = (current.options + verified).distinctBy { it.market }
+                        )
+                    else current
+                }
+            }
+        }
+    }
+
     fun closeApp() { _selectedApp.value = null }
 
     /** Скачивание выбранного варианта. DIRECT_APK — своя загрузка, STOREFRONT — переход. */
@@ -220,9 +239,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     iconUrl = app.iconUrl,
                     marketLabel = option.market.label
                 ) { file ->
-                    if (settings.value.autoScanDownloads &&
-                        settings.value.virusTotalApiKey.isNotBlank()
-                    ) {
+                    if (settings.value.autoScanDownloads && effectiveVtKey().isNotBlank()) {
                         scanFile(taskId, file)
                     }
                 }
@@ -235,11 +252,26 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { scanFile(task.id, File(path)) }
     }
 
+    /** Ключ из настроек, а если пуст — встроенный из сборки (GitHub-секрет). */
+    private fun effectiveVtKey(): String =
+        settings.value.virusTotalApiKey.ifBlank { com.evastore.app.BuildConfig.VT_API_KEY }
+
     private suspend fun scanFile(taskId: String, file: File) {
-        val key = settings.value.virusTotalApiKey
+        val key = effectiveVtKey()
         if (key.isBlank()) {
-            _scanStates.update {
-                it + (taskId to ScanState.Error("Добавьте API-ключ VirusTotal в Настройках"))
+            // Без ключа: открываем публичный отчёт VirusTotal по SHA-256 в браузере.
+            val sha = runCatching { fileSha256(file) }.getOrNull()
+            if (sha != null) {
+                openExternal("https://www.virustotal.com/gui/file/$sha")
+                _scanStates.update {
+                    it + (taskId to ScanState.Error(
+                        "Отчёт открыт в браузере. Для проверки внутри приложения добавьте API-ключ в Настройках."
+                    ))
+                }
+            } else {
+                _scanStates.update {
+                    it + (taskId to ScanState.Error("Добавьте API-ключ VirusTotal в Настройках"))
+                }
             }
             return
         }
@@ -279,5 +311,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             getApplication<Application>().startActivity(intent)
         }
+    }
+
+    private fun fileSha256(file: File): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val read = input.read(buffer)
+                if (read == -1) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 }
