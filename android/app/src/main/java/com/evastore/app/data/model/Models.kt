@@ -15,6 +15,8 @@ enum class Market(
     FDROID("F-Droid", SourceType.DIRECT_APK, 0xFF1976D2),
     GITHUB("GitHub", SourceType.DIRECT_APK, 0xFF24292F),
     RUSTORE("RuStore", SourceType.DIRECT_APK, 0xFF0077FF),
+    APTOIDE("Aptoide", SourceType.DIRECT_APK, 0xFFF47C20),
+    APKPURE("APKPure", SourceType.DIRECT_APK, 0xFF6CC24D),
     GETAPPS("GetApps", SourceType.STOREFRONT, 0xFFFF6900),
     GOOGLE_PLAY("Google Play", SourceType.STOREFRONT, 0xFF34A853),
     APP_STORE("App Store", SourceType.STOREFRONT, 0xFF0D84FF)
@@ -29,7 +31,9 @@ data class DownloadOption(
     val sizeBytes: Long? = null,
     val fileName: String? = null,
     /** Числовой ID приложения в RuStore — нужен для получения прямой ссылки. */
-    val appId: Long? = null
+    val appId: Long? = null,
+    /** SHA-1/256 файла, если известен из API маркета — для VirusTotal-лукапа без загрузки. */
+    val sha1: String? = null
 )
 
 /** Приложение в каталоге Eva Store. */
@@ -41,9 +45,14 @@ data class StoreApp(
     val iconUrl: String?,
     val developer: String?,
     val category: String?,
-    val options: List<DownloadOption>
+    val options: List<DownloadOption>,
+    val rating: Double? = null,
+    val downloads: Long? = null
 ) {
     val primaryMarket: Market get() = options.first().market
+
+    /** Наименьший известный размер среди прямых источников. */
+    val sizeBytes: Long? get() = options.mapNotNull { it.sizeBytes }.minOrNull()
 }
 
 /** Результат VirusTotal-скана. */

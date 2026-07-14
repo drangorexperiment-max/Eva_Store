@@ -40,7 +40,9 @@ data class SearchUiState(
     val results: List<StoreApp> = emptyList(),
     val iconSearchActive: Boolean = false,
     val iconMatches: List<IconSearchEngine.Match> = emptyList(),
-    val selectedMarkets: Set<Market> = setOf(Market.FDROID, Market.RUSTORE, Market.GITHUB),
+    val selectedMarkets: Set<Market> = setOf(
+        Market.RUSTORE, Market.APKPURE, Market.APTOIDE, Market.FDROID, Market.GITHUB
+    ),
     val error: String? = null
 )
 
@@ -190,10 +192,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         runCatching {
                             RustoreSource.resolveApkUrl(appId)?.let { url ->
                                 val name = option.fileName ?: "${app.packageName ?: "rustore"}.apk"
-                                Triple(url, name, null as Long?)
+                                Triple(url, name, option.sizeBytes)
                             }
                         }.getOrNull()
                     }
+                    // Aptoide и APKPure отдают прямую ссылку сразу в поиске.
+                    Market.APTOIDE, Market.APKPURE -> Triple(
+                        option.url,
+                        option.fileName ?: "${app.packageName ?: option.market.name.lowercase()}.apk",
+                        option.sizeBytes
+                    )
                     else -> null
                 }
 

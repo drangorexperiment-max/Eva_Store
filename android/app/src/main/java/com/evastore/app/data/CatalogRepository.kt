@@ -2,6 +2,8 @@ package com.evastore.app.data
 
 import com.evastore.app.data.model.Market
 import com.evastore.app.data.model.StoreApp
+import com.evastore.app.data.sources.ApkPureSource
+import com.evastore.app.data.sources.AptoideSource
 import com.evastore.app.data.sources.FdroidSource
 import com.evastore.app.data.sources.GithubSource
 import com.evastore.app.data.sources.MarketSource
@@ -17,8 +19,10 @@ import kotlinx.coroutines.coroutineScope
 class CatalogRepository {
 
     private val sources: List<MarketSource> = listOf(
-        FdroidSource,
         RustoreSource,
+        ApkPureSource,
+        AptoideSource,
+        FdroidSource,
         GithubSource
     )
 
@@ -40,17 +44,23 @@ class CatalogRepository {
 
     /** Популярное на главной: подборка запросов по категориям из разных маркетов. */
     suspend fun featured(): List<StoreApp> = coroutineScope {
-        val fdroidQueries = listOf("browser", "messenger", "game", "music", "player")
         val rustoreQueries = listOf("игра", "мессенджер", "музыка", "браузер")
+        val apkpureQueries = listOf("popular", "game")
+        val fdroidQueries = listOf("browser", "player")
 
-        val fdroid = fdroidQueries.map { q ->
-            async { runCatching { FdroidSource.search(q).take(5) }.getOrDefault(emptyList()) }
+        val jobs = buildList {
+            rustoreQueries.forEach { q ->
+                add(async { runCatching { RustoreSource.search(q).take(6) }.getOrDefault(emptyList()) })
+            }
+            apkpureQueries.forEach { q ->
+                add(async { runCatching { ApkPureSource.search(q).take(8) }.getOrDefault(emptyList()) })
+            }
+            fdroidQueries.forEach { q ->
+                add(async { runCatching { FdroidSource.search(q).take(4) }.getOrDefault(emptyList()) })
+            }
         }
-        val rustore = rustoreQueries.map { q ->
-            async { runCatching { RustoreSource.search(q).take(5) }.getOrDefault(emptyList()) }
-        }
-        val all = (fdroid + rustore).map { it.await() }.flatten()
-        mergeByPackage(all).shuffled().take(30)
+        val all = jobs.map { it.await() }.flatten()
+        mergeByPackage(all).shuffled().take(36)
     }
 
     /** Категории для главной с готовыми запросами. */

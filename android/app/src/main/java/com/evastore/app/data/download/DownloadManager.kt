@@ -12,12 +12,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
 import okhttp3.Request
 import java.io.File
 import java.io.IOException
 
 enum class DownloadStatus { QUEUED, DOWNLOADING, SCANNING, DONE, FAILED }
 
+@kotlinx.serialization.Serializable
 data class DownloadTask(
     val id: String,
     val appName: String,
@@ -46,6 +48,41 @@ class ApkDownloader(private val context: Context) {
     private val downloadsDir: File
         get() = File(context.filesDir, "downloads").apply { mkdirs() }
 
+    /** Журнал загрузок — переживает перезапуск приложения. */
+    private val stateFile: File get() = File(context.filesDir, "downloads_state.json")
+
+    init {
+        restore()
+    }
+
+    private fun restore() {
+        runCatching {
+            if (!stateFile.exists()) return
+            val saved = Http.json
+                .decodeFromString<List<DownloadTask>>(stateFile.readText())
+                .mapNotNull { task ->
+                    when (task.status) {
+                        // Завершённые: оставляем, только если файл ещё на месте.
+                        DownloadStatus.DONE, DownloadStatus.SCANNING ->
+                            if (task.filePath != null && File(task.filePath).exists())
+                                task.copy(status = DownloadStatus.DONE)
+                            else null
+                        // Оборванные при выходе загрузки помечаем ошибкой.
+                        DownloadStatus.QUEUED, DownloadStatus.DOWNLOADING ->
+                            task.copy(status = DownloadStatus.FAILED, error = "Загрузка прервана")
+                        DownloadStatus.FAILED -> task
+                    }
+                }
+            _tasks.value = saved
+        }
+    }
+
+    private fun persist() {
+        runCatching {
+            stateFile.writeText(Http.json.encodeToString(_tasks.value))
+        }
+    }
+
     fun enqueue(
         id: String,
         appName: String,
@@ -59,6 +96,7 @@ class ApkDownloader(private val context: Context) {
 
         val task = DownloadTask(id, appName, fileName, url, iconUrl, marketLabel)
         _tasks.update { list -> list.filterNot { it.id == id } + task }
+        persist()
 
         scope.launch {
             try {
@@ -95,6 +133,7 @@ class ApkDownloader(private val context: Context) {
             runCatching { File(path).delete() }
         }
         _tasks.update { list -> list.filterNot { it.id == id } }
+        persist()
     }
 
     private suspend fun downloadFile(id: String, url: String, fileName: String): File {
@@ -179,6 +218,7 @@ class ApkDownloader(private val context: Context) {
 
     private fun update(id: String, transform: (DownloadTask) -> DownloadTask) {
         _tasks.update { list -> list.map { if (it.id == id) transform(it) else it } }
+        persist()
     }
 
     private fun String.sanitized(): String = replace(Regex("[^A-Za-z0-9._-]"), "_")

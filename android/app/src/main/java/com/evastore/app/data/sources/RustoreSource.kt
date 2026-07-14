@@ -6,6 +6,7 @@ import com.evastore.app.data.model.StoreApp
 import com.evastore.app.data.network.Http
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -33,6 +34,8 @@ object RustoreSource : MarketSource {
             // Платные приложения не отдают прямой APK — их ведём на витрину.
             val price = obj["price"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
             val versionCode = obj["versionCode"]?.jsonPrimitive?.content
+            val versionName = obj["versionName"]?.jsonPrimitive?.contentOrNull
+            val fileSize = obj["fileSize"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
             StoreApp(
                 id = "rustore:$pkg",
                 name = name,
@@ -46,6 +49,8 @@ object RustoreSource : MarketSource {
                         market = Market.RUSTORE,
                         url = "https://www.rustore.ru/catalog/app/$pkg",
                         appId = if (price == 0) appId else null,
+                        versionName = versionName,
+                        sizeBytes = fileSize,
                         fileName = "${pkg}_${versionCode ?: "rustore"}.apk"
                     )
                 )
@@ -53,22 +58,67 @@ object RustoreSource : MarketSource {
         }
     }
 
-    @Serializable
-    private data class DownloadLinkResponse(val body: LinkBody? = null)
-
-    @Serializable
-    private data class LinkBody(val apkUrl: String? = null, val versionCode: Long? = null)
-
     /**
-     * Получает прямую ссылку на файл (zip-контейнер с APK внутри) по appId.
-     * Возвращает пару: URL и признак того, что это zip-архив.
+     * Получает прямую ссылку на единый APK по appId через v2-эндпоинт
+     * с флагом withoutSplits=true — тот же метод, что использует
+     * веб-загрузчик rustore-downloader. Возвращает универсальный apk,
+     * а не набор split-частей, поэтому файл ставится напрямую.
      */
     suspend fun resolveApkUrl(appId: Long): String? {
-        val resp = Http.postJson(
-            "https://backapi.rustore.ru/applicationData/download-link",
-            """{"appId":$appId,"firstInstall":true}"""
-        )
-        val parsed = Http.json.decodeFromString<DownloadLinkResponse>(resp)
-        return parsed.body?.apkUrl
+        val requestBody = """
+            {
+              "appId": $appId,
+              "firstInstall": true,
+              "withoutSplits": true,
+              "mobileServices": ["GMS","HMS"],
+              "supportedAbis": ["arm64-v8a","armeabi-v7a","x86_64","x86","armeabi"],
+              "screenDensity": 480,
+              "supportedLocales": ["ru_RU","en_US"],
+              "sdkVersion": 34,
+              "signatureFingerprint": null
+            }
+        """.trimIndent()
+
+        // Сначала пробуем v2 (единый apk), при неудаче — старый v1.
+        val v2 = runCatching {
+            Http.postJson("https://backapi.rustore.ru/applicationData/v2/download-link", requestBody)
+        }.getOrNull()
+        parseApkUrl(v2)?.let { return it }
+
+        val v1 = runCatching {
+            Http.postJson(
+                "https://backapi.rustore.ru/applicationData/download-link",
+                """{"appId":$appId,"firstInstall":true}"""
+            )
+        }.getOrNull()
+        return parseApkUrl(v1)
+    }
+
+    private fun parseApkUrl(resp: String?): String? {
+        if (resp.isNullOrBlank()) return null
+        val body = runCatching {
+            Http.json.parseToJsonElement(resp).jsonObject["body"]?.jsonObject
+        }.getOrNull() ?: return null
+        // Разные варианты полей в v1/v2.
+        body["apkUrl"]?.jsonPrimitive?.content?.let { if (it.isNotBlank()) return it }
+        val urls = body["downloadUrls"]?.jsonArray ?: body["apkUrls"]?.jsonArray
+        urls?.firstOrNull()?.let { el ->
+            (el as? JsonObject)?.get("url")?.jsonPrimitive?.content?.let { return it }
+            el.jsonPrimitive.contentOrNull?.let { return it }
+        }
+        return null
+    }
+
+    /** Размер файла и версия из подробной карточки. */
+    suspend fun fetchDetails(packageName: String): Pair<Long?, String?>? {
+        val resp = runCatching {
+            Http.get("https://backapi.rustore.ru/applicationData/overallInfo/$packageName")
+        }.getOrNull() ?: return null
+        val body = runCatching {
+            Http.json.parseToJsonElement(resp).jsonObject["body"]?.jsonObject
+        }.getOrNull() ?: return null
+        val size = body["fileSize"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+        val version = body["versionName"]?.jsonPrimitive?.contentOrNull
+        return size to version
     }
 }
