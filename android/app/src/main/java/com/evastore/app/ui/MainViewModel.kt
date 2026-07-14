@@ -26,6 +26,9 @@ import com.evastore.app.data.sources.StorefrontLinks
 import com.evastore.app.ui.theme.ThemeMode
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -213,12 +216,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             "игры", "банк", "карты", "видео", "фото"
         )
         val markets = setOf(Market.GOOGLE_PLAY, Market.RUSTORE, Market.APKPURE)
-        val results = kotlinx.coroutines.coroutineScope {
+        val results = coroutineScope {
             seeds.map { seed ->
-                kotlinx.coroutines.async {
+                async {
                     runCatching { catalog.search(seed, markets) }.getOrDefault(emptyList())
                 }
-            }.map { it.await() }
+            }.awaitAll()
         }.flatten().distinctBy { it.id }
         iconPoolCache = results
         return results
