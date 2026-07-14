@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
+    <!-- Внутренняя папка filesDir/downloads — сюда качает ApkDownloader -->
+    <files-path name="apks" path="downloads/" />
+    <!-- Внешняя папка на случай будущих загрузок в external storage -->
     <external-files-path name="downloads" path="Download/" />
 </paths>
