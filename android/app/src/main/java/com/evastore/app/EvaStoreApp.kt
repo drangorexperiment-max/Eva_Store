@@ -7,6 +7,7 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.evastore.app.data.sources.GooglePlaySource
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -14,6 +15,10 @@ class EvaStoreApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Google Play (Aurora-подход) требует профиль устройства из ресурсов —
+        // передаём контекст приложения источнику для загрузки px_9a.properties.
+        GooglePlaySource.init(this)
         // Сохраняем текст любого необработанного краша в файл,
         // чтобы показать его пользователю при следующем запуске.
         Thread.setDefaultUncaughtExceptionHandler { _, throwable ->

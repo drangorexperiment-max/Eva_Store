@@ -71,5 +71,6 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     // Google Play API (Aurora OSS) — анонимный вход и прямое скачивание APK.
-    implementation("com.auroraoss:gplayapi:3.6.3")
+    // 3.5.5 собрана под Kotlin 2.1.x — совместима с нашим Kotlin-плагином 2.1.21.
+    implementation("com.auroraoss:gplayapi:3.5.5")
 }

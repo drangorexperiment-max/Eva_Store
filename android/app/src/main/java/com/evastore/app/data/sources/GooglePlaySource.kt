@@ -1,6 +1,8 @@
 package com.evastore.app.data.sources
 
+import android.content.Context
 import com.aurora.gplayapi.data.models.AuthData
+import com.aurora.gplayapi.data.models.PlayFile
 import com.aurora.gplayapi.helpers.AppDetailsHelper
 import com.aurora.gplayapi.helpers.AuthHelper
 import com.aurora.gplayapi.helpers.PurchaseHelper
@@ -17,6 +19,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.util.Locale
+import java.util.Properties
 
 /**
  * Google Play через Aurora-подход: анонимный AuthToken от диспенсера
@@ -30,9 +33,35 @@ object GooglePlaySource : MarketSource {
     private const val DISPENSER_URL = "https://auroraoss.com/api/auth"
 
     @Volatile
+    private var appContext: Context? = null
+
+    @Volatile
     private var cachedAuth: AuthData? = null
     private var authAcquiredAt = 0L
     private val authMutex = Mutex()
+
+    /** Вызывается из Application.onCreate — даёт доступ к ресурсам с профилями устройств. */
+    fun init(context: Context) {
+        appContext = context.applicationContext
+    }
+
+    /**
+     * Профиль устройства (spoof) из ресурсов gplayapi (res/raw). На Android
+     * его нельзя получить через classLoader, поэтому читаем сами и передаём
+     * в AuthHelper.build явно.
+     */
+    private fun deviceProperties(): Properties? {
+        val ctx = appContext ?: return null
+        return runCatching {
+            val resId = ctx.resources.getIdentifier(
+                "gplayapi_px_9a", "raw", ctx.packageName
+            )
+            if (resId == 0) return null
+            Properties().apply {
+                ctx.resources.openRawResource(resId).use { load(it) }
+            }
+        }.getOrNull()
+    }
 
     /** Токен Google живёт ~1 час; обновляем заранее. */
     private const val MAX_AUTH_AGE_MS = 45L * 60 * 1000
@@ -60,11 +89,13 @@ object GooglePlaySource : MarketSource {
         val obj = Http.json.parseToJsonElement(response).jsonObject
         val email = obj["email"]?.jsonPrimitive?.contentOrNull ?: return null
         val token = obj["authToken"]?.jsonPrimitive?.contentOrNull ?: return null
+        val properties = deviceProperties() ?: return null
         AuthHelper.build(
             email = email,
             token = token,
             tokenType = AuthHelper.Token.AUTH,
             isAnonymous = true,
+            properties = properties,
             locale = Locale.getDefault()
         )
     }.getOrNull()
@@ -115,8 +146,8 @@ object GooglePlaySource : MarketSource {
                 if (!app.isFree) return@runCatching null
                 val files = PurchaseHelper(authData)
                     .purchase(app.packageName, app.versionCode, app.offerType)
-                val base = files.firstOrNull { it.name.endsWith(".apk") && !it.name.contains("config.") }
-                    ?: files.firstOrNull()
+                val base = files.firstOrNull { it.type == PlayFile.Type.BASE }
+                    ?: files.firstOrNull { it.name.endsWith(".apk") }
                     ?: return@runCatching null
                 Triple(
                     base.url,
