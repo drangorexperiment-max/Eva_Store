@@ -6,8 +6,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.Call
 import okhttp3.Callback
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -32,6 +34,19 @@ object Http {
                 .header("User-Agent", "EvaStore/1.0")
             headers.forEach { (k, v) -> builder.header(k, v) }
             client.newCall(builder.build()).await().use { resp ->
+                if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}: $url")
+                resp.body?.string() ?: throw IOException("Empty body: $url")
+            }
+        }
+
+    suspend fun postJson(url: String, jsonBody: String): String =
+        withContext(Dispatchers.IO) {
+            val body = jsonBody.toRequestBody("application/json".toMediaType())
+            val request = Request.Builder().url(url)
+                .header("User-Agent", "EvaStore/1.0")
+                .post(body)
+                .build()
+            client.newCall(request).await().use { resp ->
                 if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}: $url")
                 resp.body?.string() ?: throw IOException("Empty body: $url")
             }

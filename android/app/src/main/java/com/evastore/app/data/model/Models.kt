@@ -27,7 +27,9 @@ data class DownloadOption(
     val url: String,
     val versionName: String? = null,
     val sizeBytes: Long? = null,
-    val fileName: String? = null
+    val fileName: String? = null,
+    /** Числовой ID приложения в RuStore — нужен для получения прямой ссылки. */
+    val appId: Long? = null
 )
 
 /** Приложение в каталоге Eva Store. */

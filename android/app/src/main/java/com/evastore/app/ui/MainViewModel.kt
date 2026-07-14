@@ -21,6 +21,7 @@ import com.evastore.app.data.settings.EvaSettings
 import com.evastore.app.data.settings.SettingsRepository
 import com.evastore.app.data.sources.FdroidSource
 import com.evastore.app.data.sources.GithubSource
+import com.evastore.app.data.sources.RustoreSource
 import com.evastore.app.ui.theme.ThemeMode
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
@@ -160,7 +161,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     loading = false,
                     iconMatches = matches,
                     error = if (matches.isEmpty())
-                        "Похожих иконок не найдено. Сначала выполните текстовый поиск — это расширит базу сравнения." else null
+                        "Похожих икон��к не найдено. Сначала выполните текстовый поиск — это расширит базу сравнения." else null
                 )
             }
         }
@@ -185,7 +186,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         GithubSource.resolveApkUrl(option.url)
                             ?.let { Triple(it.first, it.second, it.third as Long?) }
                     }.getOrNull()
-                    Market.RUSTORE -> null // прямой APK недоступен — открываем витрину
+                    Market.RUSTORE -> option.appId?.let { appId ->
+                        runCatching {
+                            RustoreSource.resolveApkUrl(appId)?.let { url ->
+                                val name = option.fileName ?: "${app.packageName ?: "rustore"}.apk"
+                                Triple(url, name, null as Long?)
+                            }
+                        }.getOrNull()
+                    }
                     else -> null
                 }
 

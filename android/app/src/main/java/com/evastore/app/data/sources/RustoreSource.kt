@@ -29,6 +29,10 @@ object RustoreSource : MarketSource {
             val obj = el as? JsonObject ?: return@mapNotNull null
             val pkg = obj["packageName"]?.jsonPrimitive?.content ?: return@mapNotNull null
             val name = obj["appName"]?.jsonPrimitive?.content ?: pkg
+            val appId = obj["appId"]?.jsonPrimitive?.content?.toLongOrNull()
+            // Платные приложения не отдают прямой APK — их ведём на витрину.
+            val price = obj["price"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+            val versionCode = obj["versionCode"]?.jsonPrimitive?.content
             StoreApp(
                 id = "rustore:$pkg",
                 name = name,
@@ -40,10 +44,31 @@ object RustoreSource : MarketSource {
                 options = listOf(
                     DownloadOption(
                         market = Market.RUSTORE,
-                        url = "https://www.rustore.ru/catalog/app/$pkg"
+                        url = "https://www.rustore.ru/catalog/app/$pkg",
+                        appId = if (price == 0) appId else null,
+                        fileName = "${pkg}_${versionCode ?: "rustore"}.apk"
                     )
                 )
             )
         }
+    }
+
+    @Serializable
+    private data class DownloadLinkResponse(val body: LinkBody? = null)
+
+    @Serializable
+    private data class LinkBody(val apkUrl: String? = null, val versionCode: Long? = null)
+
+    /**
+     * Получает прямую ссылку на файл (zip-контейнер с APK внутри) по appId.
+     * Возвращает пару: URL и признак того, что это zip-архив.
+     */
+    suspend fun resolveApkUrl(appId: Long): String? {
+        val resp = Http.postJson(
+            "https://backapi.rustore.ru/applicationData/download-link",
+            """{"appId":$appId,"firstInstall":true}"""
+        )
+        val parsed = Http.json.decodeFromString<DownloadLinkResponse>(resp)
+        return parsed.body?.apkUrl
     }
 }

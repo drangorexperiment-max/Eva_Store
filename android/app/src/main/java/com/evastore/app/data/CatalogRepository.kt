@@ -38,16 +38,32 @@ class CatalogRepository {
         mergeByPackage(results.flatten())
     }
 
-    /** Популярное на главной: подборка запросов по категориям. */
+    /** Популярное на главной: подборка запросов по категориям из разных маркетов. */
     suspend fun featured(): List<StoreApp> = coroutineScope {
-        val queries = listOf("browser", "messenger", "game", "music", "launcher")
-        val results = queries.map { q ->
-            async {
-                runCatching { FdroidSource.search(q).take(6) }.getOrDefault(emptyList())
-            }
-        }.map { it.await() }
-        mergeByPackage(results.flatten()).shuffled().take(24)
+        val fdroidQueries = listOf("browser", "messenger", "game", "music", "player")
+        val rustoreQueries = listOf("игра", "мессенджер", "музыка", "браузер")
+
+        val fdroid = fdroidQueries.map { q ->
+            async { runCatching { FdroidSource.search(q).take(5) }.getOrDefault(emptyList()) }
+        }
+        val rustore = rustoreQueries.map { q ->
+            async { runCatching { RustoreSource.search(q).take(5) }.getOrDefault(emptyList()) }
+        }
+        val all = (fdroid + rustore).map { it.await() }.flatten()
+        mergeByPackage(all).shuffled().take(30)
     }
+
+    /** Категории для главной с готовыми запросами. */
+    val categories: List<Pair<String, String>> = listOf(
+        "Игры" to "game",
+        "Мессенджеры" to "messenger",
+        "Музыка" to "music",
+        "Браузеры" to "browser",
+        "Инструменты" to "tools",
+        "Камера" to "camera"
+    )
+
+    suspend fun byQuery(query: String): List<StoreApp> = search(query)
 
     private fun mergeByPackage(apps: List<StoreApp>): List<StoreApp> {
         val byPackage = LinkedHashMap<String, StoreApp>()

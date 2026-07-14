@@ -15,43 +15,46 @@ object FdroidSource : MarketSource {
     override val market = Market.FDROID
 
     @Serializable
-    private data class SearchResponse(val results: List<Result> = emptyList())
+    private data class SearchResponse(val apps: List<Result> = emptyList())
 
     @Serializable
     private data class Result(
-        val package_name: String = "",
         val name: String = "",
         val summary: String = "",
-        val icon: String? = null
+        val icon: String? = null,
+        val url: String = ""
     )
+
+    /** Извлекает packageName из ссылки вида .../packages/org.some.app */
+    private fun packageFromUrl(url: String): String? =
+        url.trimEnd('/').substringAfterLast("/packages/", "")
+            .substringBefore('/')
+            .takeIf { it.isNotBlank() && it.contains('.') }
 
     override suspend fun search(query: String): List<StoreApp> {
         val body = Http.get(
             "https://search.f-droid.org/api/search_apps?q=${query.urlEncode()}&lang=en"
         )
         val parsed = Http.json.decodeFromString<SearchResponse>(body)
-        return parsed.results.take(30).map { r ->
-            val icon = r.icon?.let { ic ->
-                if (ic.startsWith("http")) ic
-                else "https://f-droid.org/repo/icons-640/$ic"
-            }
+        return parsed.apps.mapNotNull { r ->
+            val pkg = packageFromUrl(r.url) ?: return@mapNotNull null
             StoreApp(
-                id = "fdroid:${r.package_name}",
-                name = r.name.ifBlank { r.package_name },
-                packageName = r.package_name,
+                id = "fdroid:$pkg",
+                name = r.name.ifBlank { pkg },
+                packageName = pkg,
                 summary = r.summary,
-                iconUrl = icon,
+                iconUrl = r.icon?.takeIf { it.startsWith("http") },
                 developer = null,
                 category = null,
                 options = listOf(
                     DownloadOption(
                         market = Market.FDROID,
                         // Страница пакета отдаёт актуальный APK; резолвим при скачивании.
-                        url = "https://f-droid.org/api/v1/packages/${r.package_name}"
+                        url = "https://f-droid.org/api/v1/packages/$pkg"
                     )
                 )
             )
-        }
+        }.take(40)
     }
 
     @Serializable

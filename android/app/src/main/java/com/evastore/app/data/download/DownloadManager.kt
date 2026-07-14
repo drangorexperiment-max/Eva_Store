@@ -63,7 +63,11 @@ class ApkDownloader(private val context: Context) {
         scope.launch {
             try {
                 update(id) { it.copy(status = DownloadStatus.DOWNLOADING) }
-                val file = downloadFile(id, url, fileName)
+                var file = downloadFile(id, url, fileName)
+                // Некоторые маркеты (RuStore) отдают zip-контейнер с APK внутри.
+                if (isZip(file)) {
+                    file = extractApk(file, fileName)
+                }
                 update(id) {
                     it.copy(
                         status = DownloadStatus.DONE,
@@ -123,6 +127,40 @@ class ApkDownloader(private val context: Context) {
                     }
                 }
             }
+            return outFile
+        }
+    }
+
+    /** APK — это тоже zip, поэтому смотрим содержимое, а не сигнатуру. */
+    private fun isZip(file: File): Boolean =
+        file.inputStream().use { input ->
+            val magic = ByteArray(2)
+            input.read(magic) == 2 && magic[0] == 'P'.code.toByte() && magic[1] == 'K'.code.toByte()
+        }
+
+    /**
+     * Если файл — контейнер (внутри лежит *.apk, как у RuStore) — достаём
+     * самый крупный APK. Если это уже сам APK (есть AndroidManifest.xml) —
+     * возвращаем как есть.
+     */
+    private fun extractApk(file: File, desiredName: String): File {
+        java.util.zip.ZipFile(file).use { zip ->
+            val entries = zip.entries().asSequence().toList()
+            // Это уже готовый APK?
+            if (entries.any { it.name == "AndroidManifest.xml" }) return file
+
+            val apkEntry = entries
+                .filter { !it.isDirectory && it.name.endsWith(".apk", ignoreCase = true) }
+                .maxByOrNull { it.size }
+                ?: return file // APK внутри нет — оставляем как есть
+
+            val outName = desiredName.sanitized().removeSuffix(".zip")
+                .let { if (it.endsWith(".apk")) it else "$it.apk" }
+            val outFile = File(downloadsDir, outName)
+            zip.getInputStream(apkEntry).use { input ->
+                outFile.outputStream().use { output -> input.copyTo(output) }
+            }
+            file.delete()
             return outFile
         }
     }
