@@ -16,7 +16,6 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Shop
 import androidx.compose.material.icons.rounded.Storefront
-import androidx.compose.material.icons.rounded.PhoneIphone
 import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,7 +44,6 @@ val Market.icon: ImageVector
         Market.APKPURE -> Icons.Rounded.Public
         Market.GETAPPS -> Icons.Rounded.Shop
         Market.GOOGLE_PLAY -> Icons.Rounded.PlayArrow
-        Market.APP_STORE -> Icons.Rounded.PhoneIphone
     }
 
 /** Читаемый размер файла: 12 МБ, 1,4 ГБ. */
@@ -59,6 +57,14 @@ fun formatBytes(bytes: Long?): String? {
         mb >= 1 -> String.format(Locale("ru"), "%.0f МБ", mb)
         else -> String.format(Locale("ru"), "%.0f КБ", kb)
     }
+}
+
+/** Читаемое число загрузок: 5 тыс., 10 млн, 1 млрд. */
+fun formatDownloads(count: Long): String = when {
+    count >= 1_000_000_000 -> "${count / 1_000_000_000} млрд+"
+    count >= 1_000_000 -> "${count / 1_000_000} млн+"
+    count >= 1_000 -> "${count / 1_000} тыс.+"
+    else -> count.toString()
 }
 
 @Composable

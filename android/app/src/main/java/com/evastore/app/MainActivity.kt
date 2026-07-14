@@ -197,6 +197,7 @@ private fun EvaStoreApp(viewModel: MainViewModel, animationsEnabled: Boolean) {
                     state = search,
                     onQueryChange = viewModel::onQueryChange,
                     onToggleMarket = viewModel::toggleMarket,
+                    onSelectAllMarkets = viewModel::selectAllMarkets,
                     onIconPicked = viewModel::searchByIcon,
                     onAppClick = viewModel::openApp,
                     contentPadding = contentPadding
@@ -220,6 +221,7 @@ private fun EvaStoreApp(viewModel: MainViewModel, animationsEnabled: Boolean) {
                     onAnimationsChange = viewModel::setAnimations,
                     onWifiOnlyChange = viewModel::setWifiOnly,
                     onVtKeyChange = viewModel::setVtApiKey,
+                    onDohChange = viewModel::setDohEnabled,
                     contentPadding = contentPadding
                 )
             }

@@ -11,12 +11,22 @@ import com.evastore.app.data.sources.MarketSource
 import com.evastore.app.data.sources.RustoreSource
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Агрегатор каталога: параллельный поиск по всем подключённым маркетам,
  * дедупликация по packageName (одно приложение — несколько источников загрузки).
+ *
+ * Каждый источник ограничен таймаутом: если маркет заблокирован
+ * провайдером и висит — поиск НЕ зависает, просто возвращаются
+ * результаты остальных маркетов.
  */
 class CatalogRepository {
+
+    private companion object {
+        /** Максимум времени на один маркет — иначе пропускаем его. */
+        const val SOURCE_TIMEOUT_MS = 8_000L
+    }
 
     private val sources: List<MarketSource> = listOf(
         GooglePlaySource,
@@ -36,7 +46,9 @@ class CatalogRepository {
         val active = sources.filter { it.market in markets }
         val results = active.map { source ->
             async {
-                runCatching { source.search(query) }.getOrDefault(emptyList())
+                withTimeoutOrNull(SOURCE_TIMEOUT_MS) {
+                    runCatching { source.search(query) }.getOrDefault(emptyList())
+                } ?: emptyList()
             }
         }.map { it.await() }
 
@@ -49,16 +61,16 @@ class CatalogRepository {
         val apkpureQueries = listOf("popular", "game")
         val fdroidQueries = listOf("browser", "player")
 
+        fun safeSearch(block: suspend () -> List<StoreApp>) = async {
+            withTimeoutOrNull(SOURCE_TIMEOUT_MS) {
+                runCatching { block() }.getOrDefault(emptyList())
+            } ?: emptyList()
+        }
+
         val jobs = buildList {
-            rustoreQueries.forEach { q ->
-                add(async { runCatching { RustoreSource.search(q).take(6) }.getOrDefault(emptyList()) })
-            }
-            apkpureQueries.forEach { q ->
-                add(async { runCatching { ApkPureSource.search(q).take(8) }.getOrDefault(emptyList()) })
-            }
-            fdroidQueries.forEach { q ->
-                add(async { runCatching { FdroidSource.search(q).take(4) }.getOrDefault(emptyList()) })
-            }
+            rustoreQueries.forEach { q -> add(safeSearch { RustoreSource.search(q).take(6) }) }
+            apkpureQueries.forEach { q -> add(safeSearch { ApkPureSource.search(q).take(8) }) }
+            fdroidQueries.forEach { q -> add(safeSearch { FdroidSource.search(q).take(4) }) }
         }
         val all = jobs.map { it.await() }.flatten()
         mergeByPackage(all).shuffled().take(36)
@@ -76,7 +88,17 @@ class CatalogRepository {
 
     suspend fun byQuery(query: String): List<StoreApp> = search(query)
 
-    private fun mergeByPackage(apps: List<StoreApp>): List<StoreApp> {
+    /**
+     * Android блокирует cleartext (http) — такие иконки молча не грузились.
+     * Приводим все URL картинок к https.
+     */
+    private fun StoreApp.withSafeImages(): StoreApp = copy(
+        iconUrl = iconUrl?.replaceFirst("http://", "https://"),
+        screenshots = screenshots.map { it.replaceFirst("http://", "https://") }
+    )
+
+    private fun mergeByPackage(rawApps: List<StoreApp>): List<StoreApp> {
+        val apps = rawApps.map { it.withSafeImages() }
         val byPackage = LinkedHashMap<String, StoreApp>()
         val noPackage = mutableListOf<StoreApp>()
 
@@ -92,6 +114,9 @@ class CatalogRepository {
                 summary = existing.summary.ifBlank { app.summary },
                 developer = existing.developer ?: app.developer,
                 category = existing.category ?: app.category,
+                rating = existing.rating ?: app.rating,
+                downloads = existing.downloads ?: app.downloads,
+                screenshots = existing.screenshots.ifEmpty { app.screenshots },
                 options = (existing.options + app.options).distinctBy { it.market }
             )
         }

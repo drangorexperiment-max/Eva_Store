@@ -69,8 +69,8 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.coil.compose)
     implementation(libs.okhttp)
+    // DNS-over-HTTPS: обходит DNS-подмену провайдеров, чтобы источники
+    // работали без VPN. Фолбэк на системный DNS при недоступности.
+    implementation(libs.okhttp.dnsoverhttps)
     implementation(libs.kotlinx.serialization.json)
-    // Google Play API (Aurora OSS) — анонимный вход и прямое скачивание APK.
-    // 3.5.5 собрана под Kotlin 2.1.x — совместима с нашим Kotlin-плагином 2.1.21.
-    implementation("com.auroraoss:gplayapi:3.5.5")
 }

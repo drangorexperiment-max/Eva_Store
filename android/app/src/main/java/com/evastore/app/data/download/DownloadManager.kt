@@ -102,9 +102,19 @@ class ApkDownloader(private val context: Context) {
             try {
                 update(id) { it.copy(status = DownloadStatus.DOWNLOADING) }
                 var file = downloadFile(id, url, fileName)
+                // Сервер мог отдать HTML-страницу ошибки вместо файла —
+                // не zip и не APK. Раньше это засчитывалось как успех,
+                // а установка падала с «Не удалось обработать пакет».
+                if (!isZip(file)) {
+                    file.delete()
+                    throw IOException("Сервер вернул не APK-файл. Попробуйте другой маркет.")
+                }
                 // Некоторые маркеты (RuStore) отдают zip-контейнер с APK внутри.
-                if (isZip(file)) {
-                    file = extractApk(file, fileName)
+                file = extractApk(file, fileName)
+                // Финальная проверка: внутри должен быть AndroidManifest.xml.
+                if (!isValidApk(file)) {
+                    file.delete()
+                    throw IOException("Файл повреждён или это не APK. Попробуйте другой маркет.")
                 }
                 update(id) {
                     it.copy(
@@ -137,12 +147,20 @@ class ApkDownloader(private val context: Context) {
     }
 
     private suspend fun downloadFile(id: String, url: String, fileName: String): File {
+        // Браузерный UA: CDN маркетов (winudf, apkpure) отклоняют
+        // неизвестных клиентов или отдают HTML вместо файла.
         val request = Request.Builder().url(url)
-            .header("User-Agent", "EvaStore/1.0")
+            .header("User-Agent", Http.UA)
+            .header("Accept", "application/vnd.android.package-archive,application/octet-stream,*/*")
             .build()
         Http.client.newCall(request).await().use { resp ->
             if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
             val body = resp.body ?: throw IOException("Пустой ответ сервера")
+            // Мгновенная отбраковка HTML-ответов (страницы ошибок CDN).
+            val contentType = body.contentType()?.toString().orEmpty()
+            if (contentType.contains("text/html", ignoreCase = true)) {
+                throw IOException("Маркет вернул страницу вместо файла. Попробуйте другой источник.")
+            }
             val total = body.contentLength()
             update(id) { it.copy(totalBytes = total) }
 
@@ -172,10 +190,17 @@ class ApkDownloader(private val context: Context) {
 
     /** APK — это тоже zip, поэтому смотрим содержимое, а не сигнатуру. */
     private fun isZip(file: File): Boolean =
-        file.inputStream().use { input ->
+        file.length() > 4 && file.inputStream().use { input ->
             val magic = ByteArray(2)
             input.read(magic) == 2 && magic[0] == 'P'.code.toByte() && magic[1] == 'K'.code.toByte()
         }
+
+    /** Настоящий APK обязан содержать AndroidManifest.xml. */
+    private fun isValidApk(file: File): Boolean = runCatching {
+        java.util.zip.ZipFile(file).use { zip ->
+            zip.getEntry("AndroidManifest.xml") != null
+        }
+    }.getOrDefault(false)
 
     /**
      * Если файл — контейнер (внутри лежит *.apk, как у RuStore) — достаём

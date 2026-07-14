@@ -17,7 +17,9 @@ data class EvaSettings(
     val showNsfw: Boolean = false,
     val animationsEnabled: Boolean = true,
     val wifiOnlyDownloads: Boolean = false,
-    val virusTotalApiKey: String = ""
+    val virusTotalApiKey: String = "",
+    /** DNS-over-HTTPS: обход DNS-блокировок провайдера (работа без VPN). */
+    val dohEnabled: Boolean = true
 )
 
 class SettingsRepository(private val context: Context) {
@@ -29,6 +31,7 @@ class SettingsRepository(private val context: Context) {
         val ANIMATIONS = booleanPreferencesKey("animations_enabled")
         val WIFI_ONLY = booleanPreferencesKey("wifi_only_downloads")
         val VT_API_KEY = stringPreferencesKey("virustotal_api_key")
+        val DOH = booleanPreferencesKey("doh_enabled")
     }
 
     val settings: Flow<EvaSettings> = context.dataStore.data.map { prefs ->
@@ -40,7 +43,8 @@ class SettingsRepository(private val context: Context) {
             showNsfw = prefs[Keys.SHOW_NSFW] ?: false,
             animationsEnabled = prefs[Keys.ANIMATIONS] ?: true,
             wifiOnlyDownloads = prefs[Keys.WIFI_ONLY] ?: false,
-            virusTotalApiKey = prefs[Keys.VT_API_KEY] ?: ""
+            virusTotalApiKey = prefs[Keys.VT_API_KEY] ?: "",
+            dohEnabled = prefs[Keys.DOH] ?: true
         )
     }
 
@@ -58,4 +62,7 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setVirusTotalApiKey(key: String) =
         context.dataStore.edit { it[Keys.VT_API_KEY] = key.trim() }
+
+    suspend fun setDohEnabled(enabled: Boolean) =
+        context.dataStore.edit { it[Keys.DOH] = enabled }
 }

@@ -18,8 +18,7 @@ enum class Market(
     APTOIDE("Aptoide", SourceType.DIRECT_APK, 0xFFF47C20),
     APKPURE("APKPure", SourceType.DIRECT_APK, 0xFF6CC24D),
     GOOGLE_PLAY("Google Play", SourceType.DIRECT_APK, 0xFF34A853),
-    GETAPPS("GetApps", SourceType.STOREFRONT, 0xFFFF6900),
-    APP_STORE("App Store", SourceType.STOREFRONT, 0xFF0D84FF)
+    GETAPPS("GetApps", SourceType.STOREFRONT, 0xFFFF6900)
 }
 
 /** Один вариант скачивания у конкретного маркета. */
@@ -47,7 +46,9 @@ data class StoreApp(
     val category: String?,
     val options: List<DownloadOption>,
     val rating: Double? = null,
-    val downloads: Long? = null
+    val downloads: Long? = null,
+    /** Скриншоты/обложки для карточки приложения (как в Google Play). */
+    val screenshots: List<String> = emptyList()
 ) {
     val primaryMarket: Market get() = options.first().market
 

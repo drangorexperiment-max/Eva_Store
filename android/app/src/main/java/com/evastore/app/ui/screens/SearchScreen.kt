@@ -45,6 +45,7 @@ fun SearchScreen(
     state: SearchUiState,
     onQueryChange: (String) -> Unit,
     onToggleMarket: (Market) -> Unit,
+    onSelectAllMarkets: () -> Unit,
     onIconPicked: (Uri) -> Unit,
     onAppClick: (StoreApp) -> Unit,
     contentPadding: PaddingValues
@@ -96,11 +97,19 @@ fun SearchScreen(
                 .padding(bottom = 10.dp)
         )
 
-        // Фильтр маркетов: все прямые источники, прокручиваемый ряд
+        // Фильтр маркетов. Первая кнопка — «Все» (включена по умолчанию,
+        // когда конкретные маркеты не выбраны). Выбор маркета отключает «Все».
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(bottom = 10.dp)
         ) {
+            item {
+                FilterChip(
+                    selected = state.selectedMarkets.isEmpty(),
+                    onClick = onSelectAllMarkets,
+                    label = { Text("Все") }
+                )
+            }
             items(
                 listOf(
                     Market.GOOGLE_PLAY, Market.RUSTORE, Market.APKPURE,

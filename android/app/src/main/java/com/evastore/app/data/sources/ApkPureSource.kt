@@ -13,9 +13,11 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 
 /**
- * APKPure: мобильное API (tapi.pureapk.com). Поиск сразу отдаёт прямую
- * ссылку на APK, размер и sha1. XAPK-контейнеры пропускаем — берём
- * только обычные APK, которые ставятся напрямую.
+ * APKPure. Поиск — мобильное API (tapi.pureapk.com), метаданные и размер.
+ * Скачивание — эндпоинт d.apkpure.com/b/APK/<pkg>, который отдаёт
+ * настоящий универсальный APK (ссылки из поиска ведут на XAPK и
+ * возвращают 405 при прямом GET — из-за этого раньше «скачивался»
+ * мусорный файл и установка падала).
  */
 object ApkPureSource : MarketSource {
 
@@ -26,9 +28,13 @@ object ApkPureSource : MarketSource {
         "Ual-Access-Businessid" to "projecta"
     )
 
+    /** Прямая ссылка на актуальный APK пакета (302 → CDN data.winudf.com). */
+    fun apkUrl(packageName: String): String =
+        "https://d.apkpure.com/b/APK/$packageName?version=latest"
+
     override suspend fun search(query: String): List<StoreApp> {
         val body = Http.get(
-            "https://tapi.pureapk.com/v3/search_query?hl=en&key=${query.urlEncode()}",
+            "https://tapi.pureapk.com/v3/search_query?hl=ru&key=${query.urlEncode()}",
             headers
         )
         val root = Http.json.parseToJsonElement(body).jsonObject
@@ -49,13 +55,8 @@ object ApkPureSource : MarketSource {
     private fun parseApp(info: JsonObject): StoreApp? {
         val pkg = info["package_name"]?.jsonPrimitive?.contentOrNull ?: return null
         val title = info["title"]?.jsonPrimitive?.contentOrNull ?: pkg
-        val asset = info["asset"]?.jsonObject ?: return null
-        // Только настоящие APK — XAPK требует особой установки.
-        val type = asset["type"]?.jsonPrimitive?.contentOrNull
-        if (type != null && !type.equals("APK", ignoreCase = true)) return null
-        val url = asset["url"]?.jsonPrimitive?.contentOrNull ?: return null
-        val size = asset["size"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
-        val sha1 = asset["sha1"]?.jsonPrimitive?.contentOrNull
+        val asset = info["asset"]?.jsonObject
+        val size = asset?.get("size")?.jsonPrimitive?.contentOrNull?.toLongOrNull()
         val versionName = info["version_name"]?.jsonPrimitive?.contentOrNull
         val icon = info["icon_url"]?.jsonPrimitive?.contentOrNull
             ?.takeIf { it.isNotBlank() }
@@ -63,6 +64,13 @@ object ApkPureSource : MarketSource {
         val rating = info["review_stars"]?.jsonPrimitive?.doubleOrNull
         val downloads = info["download_count"]?.jsonPrimitive?.longOrNull
         val developer = info["developer"]?.jsonPrimitive?.contentOrNull
+        val screenshots = (info["screenshots"] as? JsonArray)
+            ?.mapNotNull { el ->
+                (el as? JsonObject)?.get("url")?.jsonPrimitive?.contentOrNull
+                    ?: el.jsonPrimitive.contentOrNull
+            }
+            ?.filter { it.startsWith("http") }
+            .orEmpty()
 
         return StoreApp(
             id = "apkpure:$pkg",
@@ -74,14 +82,15 @@ object ApkPureSource : MarketSource {
             category = info["category_name"]?.jsonPrimitive?.contentOrNull,
             rating = rating,
             downloads = downloads,
+            screenshots = screenshots,
             options = listOf(
                 DownloadOption(
                     market = Market.APKPURE,
-                    url = url,
+                    // Стабильный эндпоинт вместо подписанных XAPK-ссылок из поиска.
+                    url = apkUrl(pkg),
                     versionName = versionName,
                     sizeBytes = size,
-                    fileName = "${pkg}_${versionName ?: "apkpure"}.apk",
-                    sha1 = sha1
+                    fileName = "${pkg}_${versionName ?: "apkpure"}.apk"
                 )
             )
         )

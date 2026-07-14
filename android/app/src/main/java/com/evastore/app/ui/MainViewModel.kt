@@ -21,7 +21,6 @@ import com.evastore.app.data.settings.EvaSettings
 import com.evastore.app.data.settings.SettingsRepository
 import com.evastore.app.data.sources.FdroidSource
 import com.evastore.app.data.sources.GithubSource
-import com.evastore.app.data.sources.GooglePlaySource
 import com.evastore.app.data.sources.RustoreSource
 import com.evastore.app.data.sources.StorefrontLinks
 import com.evastore.app.ui.theme.ThemeMode
@@ -42,12 +41,22 @@ data class SearchUiState(
     val results: List<StoreApp> = emptyList(),
     val iconSearchActive: Boolean = false,
     val iconMatches: List<IconSearchEngine.Match> = emptyList(),
-    val selectedMarkets: Set<Market> = setOf(
-        Market.GOOGLE_PLAY, Market.RUSTORE, Market.APKPURE,
-        Market.APTOIDE, Market.FDROID, Market.GITHUB
-    ),
+    /**
+     * Выбранные маркеты. Пустой набор = режим «Все»: поиск идёт по всем
+     * маркетам сразу (это состояние по умолчанию).
+     */
+    val selectedMarkets: Set<Market> = emptySet(),
     val error: String? = null
-)
+) {
+    /** Маркеты, по которым реально идёт поиск. */
+    val effectiveMarkets: Set<Market>
+        get() = selectedMarkets.ifEmpty {
+            setOf(
+                Market.GOOGLE_PLAY, Market.RUSTORE, Market.APKPURE,
+                Market.APTOIDE, Market.FDROID, Market.GITHUB
+            )
+        }
+}
 
 data class HomeUiState(
     val loading: Boolean = true,
@@ -93,6 +102,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 if (q.length >= 2) performSearch(q)
             }
         }
+        // Применяем настройку DoH к сетевому слою при каждом изменении.
+        viewModelScope.launch {
+            settings.collect { s ->
+                com.evastore.app.data.network.Http.setDohEnabled(s.dohEnabled)
+            }
+        }
     }
 
     fun loadFeatured() {
@@ -121,8 +136,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _search.update { state ->
             val newSet = if (market in state.selectedMarkets)
                 state.selectedMarkets - market else state.selectedMarkets + market
-            state.copy(selectedMarkets = newSet.ifEmpty { setOf(Market.FDROID) })
+            state.copy(selectedMarkets = newSet)
         }
+        if (_search.value.query.length >= 2) performSearch(_search.value.query)
+    }
+
+    /** Кнопка «Все»: сбрасывает выбор — поиск по всем маркетам. */
+    fun selectAllMarkets() {
+        _search.update { it.copy(selectedMarkets = emptySet()) }
         if (_search.value.query.length >= 2) performSearch(_search.value.query)
     }
 
@@ -130,7 +151,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             _search.update { it.copy(loading = true, error = null, iconSearchActive = false) }
-            runCatching { catalog.search(query, _search.value.selectedMarkets) }
+            runCatching { catalog.search(query, _search.value.effectiveMarkets) }
                 .onSuccess { apps ->
                     _search.update { it.copy(loading = false, results = apps) }
                 }
@@ -155,21 +176,52 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 return@launch
             }
-            // Кандидаты: текущие результаты + подборка с главной
-            val candidates = (_search.value.results + _home.value.featured).distinctBy { it.id }
-            val pool = candidates.ifEmpty {
-                runCatching { catalog.featured() }.getOrDefault(emptyList())
+            // Кандидаты: текущие результаты + подборка с главной.
+            var pool = (_search.value.results + _home.value.featured).distinctBy { it.id }
+            if (pool.size < 30) {
+                pool = (pool + buildIconSearchPool()).distinctBy { it.id }
             }
-            val matches = iconSearch.findSimilar(hash, pool)
+            var matches = iconSearch.findSimilar(hash, pool)
+            // Матчей нет — расширяем базу популярными запросами и пробуем ещё раз.
+            if (matches.isEmpty()) {
+                pool = (pool + buildIconSearchPool()).distinctBy { it.id }
+                matches = iconSearch.findSimilar(hash, pool)
+            }
             _search.update {
                 it.copy(
                     loading = false,
                     iconMatches = matches,
                     error = if (matches.isEmpty())
-                        "Похожих иконок не найдено. Сначала выполните текстовый поиск — это расширит базу сравнения." else null
+                        "Похожих иконок не найдено. Попробуйте картинку покрупнее или без рамок." else null
                 )
             }
         }
+    }
+
+    /** Кэш пула кандидатов для поиска по иконке. */
+    private var iconPoolCache: List<StoreApp> = emptyList()
+
+    /**
+     * Наполняет базу сравнения: прогоняет популярные категории-запросы
+     * по всем маркетам параллельно, собирая несколько сотен приложений
+     * с иконками. Кэшируется на время жизни ViewModel.
+     */
+    private suspend fun buildIconSearchPool(): List<StoreApp> {
+        if (iconPoolCache.isNotEmpty()) return iconPoolCache
+        val seeds = listOf(
+            "telegram", "whatsapp", "vpn", "браузер", "музыка",
+            "игры", "банк", "карты", "видео", "фото"
+        )
+        val markets = setOf(Market.GOOGLE_PLAY, Market.RUSTORE, Market.APKPURE)
+        val results = kotlinx.coroutines.coroutineScope {
+            seeds.map { seed ->
+                kotlinx.coroutines.async {
+                    runCatching { catalog.search(seed, markets) }.getOrDefault(emptyList())
+                }
+            }.map { it.await() }
+        }.flatten().distinctBy { it.id }
+        iconPoolCache = results
+        return results
     }
 
     fun openApp(app: StoreApp) {
@@ -217,17 +269,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             }
                         }.getOrNull()
                     }
-                    // Aptoide и APKPure отдают прямую ссылку сразу в поиске.
-                    Market.APTOIDE, Market.APKPURE -> Triple(
+                    // Aptoide, APKPure и Google Play (зеркало) отдают
+                    // прямую ссылку на APK сразу в поиске.
+                    Market.APTOIDE, Market.APKPURE, Market.GOOGLE_PLAY -> Triple(
                         option.url,
                         option.fileName ?: "${app.packageName ?: option.market.name.lowercase()}.apk",
                         option.sizeBytes
                     )
-                    // Google Play: получаем прямую ссылку через анонимный
-                    // аккаунт (Aurora-подход). При неудаче — откроем витрину.
-                    Market.GOOGLE_PLAY -> app.packageName?.let { pkg ->
-                        runCatching { GooglePlaySource.resolveApk(pkg) }.getOrNull()
-                    }
                     else -> null
                 }
 
@@ -311,6 +359,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setAnimations(v: Boolean) = viewModelScope.launch { settingsRepo.setAnimations(v) }
     fun setWifiOnly(v: Boolean) = viewModelScope.launch { settingsRepo.setWifiOnly(v) }
     fun setVtApiKey(key: String) = viewModelScope.launch { settingsRepo.setVirusTotalApiKey(key) }
+    fun setDohEnabled(v: Boolean) = viewModelScope.launch { settingsRepo.setDohEnabled(v) }
 
     private fun openExternal(url: String) {
         runCatching {
