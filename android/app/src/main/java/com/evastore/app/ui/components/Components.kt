@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Android
 import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Shop
 import androidx.compose.material.icons.rounded.Storefront
@@ -43,7 +44,7 @@ val Market.icon: ImageVector
         Market.APTOIDE -> Icons.Rounded.Widgets
         Market.APKPURE -> Icons.Rounded.Public
         Market.GETAPPS -> Icons.Rounded.Shop
-        Market.GOOGLE_PLAY -> Icons.Rounded.Shop
+        Market.GOOGLE_PLAY -> Icons.Rounded.PlayArrow
         Market.APP_STORE -> Icons.Rounded.PhoneIphone
     }
 

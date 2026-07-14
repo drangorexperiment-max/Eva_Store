@@ -17,8 +17,8 @@ enum class Market(
     RUSTORE("RuStore", SourceType.DIRECT_APK, 0xFF0077FF),
     APTOIDE("Aptoide", SourceType.DIRECT_APK, 0xFFF47C20),
     APKPURE("APKPure", SourceType.DIRECT_APK, 0xFF6CC24D),
+    GOOGLE_PLAY("Google Play", SourceType.DIRECT_APK, 0xFF34A853),
     GETAPPS("GetApps", SourceType.STOREFRONT, 0xFFFF6900),
-    GOOGLE_PLAY("Google Play", SourceType.STOREFRONT, 0xFF34A853),
     APP_STORE("App Store", SourceType.STOREFRONT, 0xFF0D84FF)
 }
 

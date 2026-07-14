@@ -70,4 +70,6 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
+    // Google Play API (Aurora OSS) — анонимный вход и прямое скачивание APK.
+    implementation("com.auroraoss:gplayapi:3.6.3")
 }

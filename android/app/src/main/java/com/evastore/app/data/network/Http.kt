@@ -62,6 +62,27 @@ object Http {
         }.getOrDefault(false)
     }
 
+    /**
+     * Синхронный POST с настраиваемыми заголовками — для вызовов из
+     * блокирующего кода (например, gplayapi работает синхронно).
+     * Вызывать только с фонового потока.
+     */
+    fun postJsonBlocking(
+        url: String,
+        jsonBody: String,
+        headers: Map<String, String> = emptyMap()
+    ): String {
+        val body = jsonBody.toRequestBody("application/json".toMediaType())
+        val builder = Request.Builder().url(url)
+            .header("User-Agent", "EvaStore/1.0")
+            .post(body)
+        headers.forEach { (k, v) -> builder.header(k, v) }
+        client.newCall(builder.build()).execute().use { resp ->
+            if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}: $url")
+            return resp.body?.string() ?: throw IOException("Empty body: $url")
+        }
+    }
+
     suspend fun postJson(url: String, jsonBody: String): String =
         withContext(Dispatchers.IO) {
             val body = jsonBody.toRequestBody("application/json".toMediaType())

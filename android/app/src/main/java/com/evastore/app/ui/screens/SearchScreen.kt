@@ -103,8 +103,8 @@ fun SearchScreen(
         ) {
             items(
                 listOf(
-                    Market.RUSTORE, Market.APKPURE, Market.APTOIDE,
-                    Market.FDROID, Market.GITHUB
+                    Market.GOOGLE_PLAY, Market.RUSTORE, Market.APKPURE,
+                    Market.APTOIDE, Market.FDROID, Market.GITHUB
                 )
             ) { market ->
                 FilterChip(

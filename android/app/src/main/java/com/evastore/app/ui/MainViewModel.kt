@@ -21,6 +21,7 @@ import com.evastore.app.data.settings.EvaSettings
 import com.evastore.app.data.settings.SettingsRepository
 import com.evastore.app.data.sources.FdroidSource
 import com.evastore.app.data.sources.GithubSource
+import com.evastore.app.data.sources.GooglePlaySource
 import com.evastore.app.data.sources.RustoreSource
 import com.evastore.app.data.sources.StorefrontLinks
 import com.evastore.app.ui.theme.ThemeMode
@@ -42,7 +43,8 @@ data class SearchUiState(
     val iconSearchActive: Boolean = false,
     val iconMatches: List<IconSearchEngine.Match> = emptyList(),
     val selectedMarkets: Set<Market> = setOf(
-        Market.RUSTORE, Market.APKPURE, Market.APTOIDE, Market.FDROID, Market.GITHUB
+        Market.GOOGLE_PLAY, Market.RUSTORE, Market.APKPURE,
+        Market.APTOIDE, Market.FDROID, Market.GITHUB
     ),
     val error: String? = null
 )
@@ -221,6 +223,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         option.fileName ?: "${app.packageName ?: option.market.name.lowercase()}.apk",
                         option.sizeBytes
                     )
+                    // Google Play: получаем прямую ссылку через анонимный
+                    // аккаунт (Aurora-подход). При неудаче — откроем витрину.
+                    Market.GOOGLE_PLAY -> app.packageName?.let { pkg ->
+                        runCatching { GooglePlaySource.resolveApk(pkg) }.getOrNull()
+                    }
                     else -> null
                 }
 

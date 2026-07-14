@@ -6,6 +6,7 @@ import com.evastore.app.data.sources.ApkPureSource
 import com.evastore.app.data.sources.AptoideSource
 import com.evastore.app.data.sources.FdroidSource
 import com.evastore.app.data.sources.GithubSource
+import com.evastore.app.data.sources.GooglePlaySource
 import com.evastore.app.data.sources.MarketSource
 import com.evastore.app.data.sources.RustoreSource
 import kotlinx.coroutines.async
@@ -18,6 +19,7 @@ import kotlinx.coroutines.coroutineScope
 class CatalogRepository {
 
     private val sources: List<MarketSource> = listOf(
+        GooglePlaySource,
         RustoreSource,
         ApkPureSource,
         AptoideSource,
