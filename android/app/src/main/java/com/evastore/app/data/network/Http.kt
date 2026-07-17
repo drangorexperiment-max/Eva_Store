@@ -96,7 +96,32 @@ object Http {
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
+        // Браузероподобный UA для всех запросов без явного заголовка
+        // (в том числе для загрузки иконок через Coil): многие CDN
+        // отдают ошибку или пустой ответ неизвестным клиентам.
+        .addInterceptor { chain ->
+            val original = chain.request()
+            val request = if (original.header("User-Agent") == null)
+                original.newBuilder().header("User-Agent", UA).build()
+            else original
+            chain.proceed(request)
+        }
         .build()
+
+    /**
+     * Прогрев DNS-кэша в фоне: заранее резолвим хосты маркетов и CDN
+     * картинок, чтобы первый поиск и иконки не ждали медленные DoH-запросы.
+     */
+    fun prewarmDns() {
+        val hosts = listOf(
+            "tapi.pureapk.com", "d.apkpure.com", "image.winudf.com",
+            "backapi.rustore.ru", "static.rustore.ru", "ws75.aptoide.com",
+            "search.f-droid.org", "f-droid.org", "api.github.com"
+        )
+        Thread {
+            hosts.forEach { host -> runCatching { SmartDns.lookup(host) } }
+        }.apply { isDaemon = true; name = "dns-prewarm" }.start()
+    }
 
     suspend fun get(url: String, headers: Map<String, String> = emptyMap()): String =
         withContext(Dispatchers.IO) {
