@@ -45,11 +45,15 @@ object GooglePlaySource : MarketSource {
                     val title = info["title"]?.jsonPrimitive?.contentOrNull ?: return@itemLoop
                     val asset = info["asset"]?.jsonObject ?: return@itemLoop
                     val type = asset["type"]?.jsonPrimitive?.contentOrNull ?: "APK"
-                    // XAPK (split-пакеты) наш установщик не поддерживает — пропускаем.
-                    if (!type.equals("APK", ignoreCase = true)) return@itemLoop
+                    // Раньше XAPK-приложения пропускались — из-за этого показывалась
+                    // лишь малая часть каталога Google Play. Теперь показываем всё:
+                    // XAPK качается как контейнер, а установщик Eva Store сам
+                    // достаёт из него основной APK.
+                    val isXapk = !type.equals("APK", ignoreCase = true)
                     // Подписанные ссылки из поиска отдают 405 — используем
                     // стабильный эндпоинт, отдающий актуальный APK по пакету.
-                    val apkUrl = "https://d.apkpure.com/b/APK/$pkg?version=latest"
+                    val apkUrl =
+                        "https://d.apkpure.com/b/${if (isXapk) "XAPK" else "APK"}/$pkg?version=latest"
 
                     // Иконка встречается в трёх форматах ответа — пробуем все.
                     val icon = info["icon_url"]?.jsonPrimitive?.contentOrNull
@@ -93,13 +97,13 @@ object GooglePlaySource : MarketSource {
                                 url = apkUrl,
                                 versionName = info["version_name"]?.jsonPrimitive?.contentOrNull,
                                 sizeBytes = asset["size"]?.jsonPrimitive?.longOrNull?.takeIf { it > 0 },
-                                fileName = "$pkg.apk"
+                                fileName = if (isXapk) "$pkg.xapk" else "$pkg.apk"
                             )
                         )
                     )
                 }
             }
-            results.distinctBy { it.packageName }.take(20)
+            results.distinctBy { it.packageName }.take(30)
         }.getOrDefault(emptyList())
     }
 }

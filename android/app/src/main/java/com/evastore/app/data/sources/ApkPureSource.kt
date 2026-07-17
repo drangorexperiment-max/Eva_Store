@@ -57,6 +57,9 @@ object ApkPureSource : MarketSource {
         val title = info["title"]?.jsonPrimitive?.contentOrNull ?: pkg
         val asset = info["asset"]?.jsonObject
         val size = asset?.get("size")?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+        val type = asset?.get("type")?.jsonPrimitive?.contentOrNull ?: "APK"
+        // XAPK качаем как контейнер — установщик достанет из него APK.
+        val isXapk = !type.equals("APK", ignoreCase = true)
         val versionName = info["version_name"]?.jsonPrimitive?.contentOrNull
         val icon = info["icon_url"]?.jsonPrimitive?.contentOrNull
             ?.takeIf { it.isNotBlank() }
@@ -87,10 +90,12 @@ object ApkPureSource : MarketSource {
                 DownloadOption(
                     market = Market.APKPURE,
                     // Стабильный эндпоинт вместо подписанных XAPK-ссылок из поиска.
-                    url = apkUrl(pkg),
+                    url = if (isXapk)
+                        "https://d.apkpure.com/b/XAPK/$pkg?version=latest"
+                    else apkUrl(pkg),
                     versionName = versionName,
                     sizeBytes = size,
-                    fileName = "${pkg}_${versionName ?: "apkpure"}.apk"
+                    fileName = "${pkg}_${versionName ?: "apkpure"}.${if (isXapk) "xapk" else "apk"}"
                 )
             )
         )

@@ -30,11 +30,14 @@ object AptoideSource : MarketSource {
             val obj = el as? JsonObject ?: return@mapNotNull null
             val pkg = obj["package"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
             val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: pkg
-            val file = obj["file"]?.jsonObject
-            val apkUrl = file?.get("path")?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val file = obj["file"]?.jsonObject ?: return@mapNotNull null
+            val apkUrl = file["path"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
             val versionName = file["vername"]?.jsonPrimitive?.contentOrNull
             val md5 = file["md5sum"]?.jsonPrimitive?.contentOrNull
-            val size = obj["size"]?.jsonPrimitive?.longOrNull
+            // Размер лежит в file.filesize — раньше читалось не то поле,
+            // и вес приложений из Aptoide не отображался.
+            val size = file["filesize"]?.jsonPrimitive?.longOrNull
+                ?: obj["size"]?.jsonPrimitive?.longOrNull
             val icon = obj["icon"]?.jsonPrimitive?.contentOrNull
             val developer = obj["developer"]?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNull
             val downloads = obj["stats"]?.jsonObject?.get("downloads")?.jsonPrimitive?.longOrNull

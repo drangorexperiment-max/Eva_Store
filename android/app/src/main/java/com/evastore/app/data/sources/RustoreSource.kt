@@ -36,6 +36,13 @@ object RustoreSource : MarketSource {
             val versionCode = obj["versionCode"]?.jsonPrimitive?.content
             val versionName = obj["versionName"]?.jsonPrimitive?.contentOrNull
             val fileSize = obj["fileSize"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+            // Рейтинг и число установок: в разных версиях API поля называются
+            // по-разному — пробуем все известные.
+            val rating = obj["averageUserRating"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
+                ?: obj["averageRating"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
+                ?: obj["rating"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
+            val downloads = obj["downloads"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+                ?: obj["downloadsCount"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
             StoreApp(
                 id = "rustore:$pkg",
                 name = name,
@@ -44,6 +51,8 @@ object RustoreSource : MarketSource {
                 iconUrl = obj["iconUrl"]?.jsonPrimitive?.content,
                 developer = obj["companyName"]?.jsonPrimitive?.content,
                 category = obj["categoryName"]?.jsonPrimitive?.content,
+                rating = rating?.takeIf { it > 0 },
+                downloads = downloads?.takeIf { it > 0 },
                 options = listOf(
                     DownloadOption(
                         market = Market.RUSTORE,
