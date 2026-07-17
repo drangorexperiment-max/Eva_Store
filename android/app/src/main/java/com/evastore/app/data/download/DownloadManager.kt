@@ -218,7 +218,7 @@ class ApkDownloader(private val context: Context) {
                 .maxByOrNull { it.size }
                 ?: return file // APK внутри нет — оставляем как есть
 
-            val outName = desiredName.sanitized().removeSuffix(".zip")
+            val outName = desiredName.sanitized().removeSuffix(".zip").removeSuffix(".xapk")
                 .let { if (it.endsWith(".apk")) it else "$it.apk" }
             val outFile = File(downloadsDir, outName)
             zip.getInputStream(apkEntry).use { input ->
