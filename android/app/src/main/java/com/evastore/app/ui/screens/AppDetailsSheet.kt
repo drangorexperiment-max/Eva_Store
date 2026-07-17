@@ -35,7 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,7 +46,6 @@ import com.evastore.app.data.model.StoreApp
 import com.evastore.app.ui.components.AppIcon
 import com.evastore.app.ui.components.formatBytes
 import com.evastore.app.ui.components.formatDownloads
-import com.evastore.app.ui.components.icon
 
 /**
  * Карточка приложения в стиле Google Play: шапка с иконкой и статистикой,
@@ -264,7 +262,6 @@ private fun StatDivider() {
 
 @Composable
 private fun MarketDownloadRow(option: DownloadOption, onClick: () -> Unit) {
-    val color = Color(option.market.brandColor)
     val direct = option.market.type == SourceType.DIRECT_APK
 
     Surface(
@@ -278,12 +275,6 @@ private fun MarketDownloadRow(option: DownloadOption, onClick: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = option.market.icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(24.dp)
-            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = option.market.label,

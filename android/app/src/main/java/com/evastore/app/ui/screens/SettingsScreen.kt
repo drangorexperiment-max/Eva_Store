@@ -248,7 +248,7 @@ private fun NetworkPage(
     SettingsCard {
         SwitchRow(
             title = "Защищённый DNS (DoH)",
-            subtitle = "Обходит DNS-блокировки провайдера — маркеты работают без VPN. Отключите, если сеть работает нестабильно.",
+            subtitle = "Шифрует DNS-запросы через Google/Cloudflare и снимает блокировки «по домену». Отключите, если сеть работает нестабильно.",
             checked = settings.dohEnabled,
             onChange = onDohChange
         )
@@ -260,7 +260,7 @@ private fun NetworkPage(
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
-            text = "Запросы DNS шифруются и отправляются напрямую к Google/Cloudflare, минуя DNS провайдера. Это снимает большинство блокировок «по домену». Если сайт заблокирован по IP, поможет только VPN — но такие источники приложение автоматически пропускает через 8 секунд, чтобы поиск не зависал.",
+            text = "Защищённый DNS снимает блокировки «по домену» — часть маркетов работает без VPN, хотя и медленнее. Если источник заблокирован по IP, обойти это без VPN невозможно — такие маркеты автоматически пропускаются через несколько секунд, чтобы поиск не зависал. Для ускорения приложение теперь заранее прогревает DNS-кэш при запуске.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -341,12 +341,12 @@ private fun SecurityPage(
 private fun AboutPage() {
     SettingsCard {
         Text(
-            text = "Eva Store 1.1.0",
+            text = "Eva Store 1.2.0",
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
-            text = "Агрегатор приложений с прямой загрузкой APK: Google Play (зеркало), RuStore, APKPure, Aptoide, F-Droid и GitHub. GetApps — как витрина. Проверка файлов через VirusTotal, обход блокировок через защищённый DNS.",
+            text = "Агрегатор приложений с прямой загрузкой APK: Google Play (зеркало), RuStore, APKPure, Aptoide, F-Droid и GitHub. Проверка файлов через VirusTotal, обход DNS-блокировок через защищённый DNS.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
