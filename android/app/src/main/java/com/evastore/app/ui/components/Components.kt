@@ -9,15 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Android
-import androidx.compose.material.icons.rounded.Code
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Public
-import androidx.compose.material.icons.rounded.Shop
-import androidx.compose.material.icons.rounded.Storefront
-import androidx.compose.material.icons.rounded.Widgets
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,26 +16,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.evastore.app.data.model.Market
 import com.evastore.app.data.model.StoreApp
 import java.util.Locale
-
-val Market.icon: ImageVector
-    get() = when (this) {
-        Market.FDROID -> Icons.Rounded.Android
-        Market.GITHUB -> Icons.Rounded.Code
-        Market.RUSTORE -> Icons.Rounded.Storefront
-        Market.APTOIDE -> Icons.Rounded.Widgets
-        Market.APKPURE -> Icons.Rounded.Public
-        Market.GETAPPS -> Icons.Rounded.Shop
-        Market.GOOGLE_PLAY -> Icons.Rounded.PlayArrow
-    }
 
 /** Читаемый размер файла: 12 МБ, 1,4 ГБ. */
 fun formatBytes(bytes: Long?): String? {
@@ -65,31 +42,6 @@ fun formatDownloads(count: Long): String = when {
     count >= 1_000_000 -> "${count / 1_000_000} млн+"
     count >= 1_000 -> "${count / 1_000} тыс.+"
     else -> count.toString()
-}
-
-@Composable
-fun MarketBadge(market: Market, modifier: Modifier = Modifier) {
-    val color = Color(market.brandColor)
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(horizontal = 8.dp, vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Icon(
-            imageVector = market.icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(12.dp)
-        )
-        Text(
-            text = market.label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
 }
 
 @Composable
