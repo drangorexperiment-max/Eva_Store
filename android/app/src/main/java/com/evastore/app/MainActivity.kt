@@ -198,7 +198,6 @@ private fun EvaStoreApp(viewModel: MainViewModel, animationsEnabled: Boolean) {
                     onQueryChange = viewModel::onQueryChange,
                     onToggleMarket = viewModel::toggleMarket,
                     onSelectAllMarkets = viewModel::selectAllMarkets,
-                    onIconPicked = viewModel::searchByIcon,
                     onAppClick = viewModel::openApp,
                     contentPadding = contentPadding
                 )

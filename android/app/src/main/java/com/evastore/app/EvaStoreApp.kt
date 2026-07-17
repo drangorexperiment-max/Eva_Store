@@ -7,6 +7,7 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.evastore.app.data.network.Http
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -14,6 +15,10 @@ class EvaStoreApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Заранее прогреваем DNS-кэш: первый поиск и загрузка иконок
+        // не ждут медленные DoH-запросы.
+        Http.prewarmDns()
 
         // Сохраняем текст любого необработанного краша в файл,
         // чтобы показать его пользователю при следующем запуске.
@@ -40,6 +45,11 @@ class EvaStoreApp : Application(), ImageLoaderFactory {
 
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
+            // Общий HTTP-клиент приложения: DNS-over-HTTPS и браузерный
+            // User-Agent — иконки грузятся так же надёжно, как и APK.
+            .okHttpClient(Http.client)
+            // Кэшируем иконки, даже если CDN запрещает кэш заголовками.
+            .respectCacheHeaders(false)
             .memoryCache {
                 MemoryCache.Builder(this)
                     .maxSizePercent(0.20)
