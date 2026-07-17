@@ -2,15 +2,12 @@ package com.evastore.app.ui
 
 import android.app.Application
 import android.content.Intent
-import android.net.Uri
 import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import coil.imageLoader
 import com.evastore.app.data.CatalogRepository
 import com.evastore.app.data.download.ApkDownloader
 import com.evastore.app.data.download.DownloadTask
-import com.evastore.app.data.iconsearch.IconSearchEngine
 import com.evastore.app.data.model.DownloadOption
 import com.evastore.app.data.model.Market
 import com.evastore.app.data.model.ScanState
@@ -21,14 +18,11 @@ import com.evastore.app.data.settings.EvaSettings
 import com.evastore.app.data.settings.SettingsRepository
 import com.evastore.app.data.sources.FdroidSource
 import com.evastore.app.data.sources.GithubSource
+import com.evastore.app.data.sources.GooglePlaySource
 import com.evastore.app.data.sources.RustoreSource
-import com.evastore.app.data.sources.StorefrontLinks
 import com.evastore.app.ui.theme.ThemeMode
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -42,8 +36,6 @@ data class SearchUiState(
     val query: String = "",
     val loading: Boolean = false,
     val results: List<StoreApp> = emptyList(),
-    val iconSearchActive: Boolean = false,
-    val iconMatches: List<IconSearchEngine.Match> = emptyList(),
     /**
      * Выбранные маркеты. Пустой набор = режим «Все»: поиск идёт по всем
      * маркетам сразу (это состояние по умолчанию).
@@ -73,7 +65,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val catalog = CatalogRepository()
     private val settingsRepo = SettingsRepository(app)
     val downloader = ApkDownloader(app)
-    private val iconSearch = IconSearchEngine(app, app.imageLoader)
 
     val settings: StateFlow<EvaSettings> = settingsRepo.settings
         .stateIn(viewModelScope, SharingStarted.Eagerly, EvaSettings())
@@ -127,7 +118,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun onQueryChange(query: String) {
-        _search.update { it.copy(query = query, iconSearchActive = false) }
+        _search.update { it.copy(query = query) }
         _queryFlow.value = query
         if (query.isBlank()) {
             searchJob?.cancel()
@@ -153,7 +144,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun performSearch(query: String) {
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
-            _search.update { it.copy(loading = true, error = null, iconSearchActive = false) }
+            _search.update { it.copy(loading = true, error = null) }
             runCatching { catalog.search(query, _search.value.effectiveMarkets) }
                 .onSuccess { apps ->
                     _search.update { it.copy(loading = false, results = apps) }
@@ -168,82 +159,69 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Поиск по изображению иконки: хэшируем картинку и ищем по каталогу. */
-    fun searchByIcon(uri: Uri) {
+    fun openApp(app: StoreApp) {
+        _selectedApp.value = app
+        // Лениво дозагружаем недостающие данные карточки: скриншоты,
+        // рейтинг, количество загрузок, размер и версию.
         viewModelScope.launch {
-            _search.update { it.copy(loading = true, iconSearchActive = true, error = null) }
-            val hash = iconSearch.hashFromUri(uri)
-            if (hash == null) {
-                _search.update {
-                    it.copy(loading = false, error = "Не удалось прочитать изображение")
-                }
-                return@launch
-            }
-            // Кандидаты: текущие результаты + подборка с главной.
-            var pool = (_search.value.results + _home.value.featured).distinctBy { it.id }
-            if (pool.size < 30) {
-                pool = (pool + buildIconSearchPool()).distinctBy { it.id }
-            }
-            var matches = iconSearch.findSimilar(hash, pool)
-            // Матчей нет — расширяем базу популярными запросами и пробуем ещё раз.
-            if (matches.isEmpty()) {
-                pool = (pool + buildIconSearchPool()).distinctBy { it.id }
-                matches = iconSearch.findSimilar(hash, pool)
-            }
-            _search.update {
-                it.copy(
-                    loading = false,
-                    iconMatches = matches,
-                    error = if (matches.isEmpty())
-                        "Похожих иконок не найдено. Попробуйте картинку покрупнее или без рамок." else null
+            val enriched = runCatching { enrichApp(app) }.getOrNull() ?: return@launch
+            _selectedApp.update { current -> if (current?.id == app.id) enriched else current }
+        }
+    }
+
+    /**
+     * Дозаполняет карточку недостающими данными, запрашивая маркеты
+     * по packageName: скриншоты и статистику — из зеркала Google Play,
+     * размер и версию — из RuStore.
+     */
+    private suspend fun enrichApp(app: StoreApp): StoreApp {
+        var result = app
+        val pkg = app.packageName ?: return result
+
+        val needsExtras = result.screenshots.isEmpty() || result.rating == null ||
+            result.downloads == null || result.sizeBytes == null
+        if (needsExtras) {
+            val match = runCatching { GooglePlaySource.search(pkg) }
+                .getOrDefault(emptyList())
+                .firstOrNull { it.packageName == pkg }
+            if (match != null) {
+                val gpOption = match.options.firstOrNull()
+                result = result.copy(
+                    screenshots = result.screenshots.ifEmpty { match.screenshots },
+                    rating = result.rating ?: match.rating,
+                    downloads = result.downloads ?: match.downloads,
+                    summary = result.summary.ifBlank { match.summary },
+                    iconUrl = result.iconUrl ?: match.iconUrl,
+                    options = result.options.map { opt ->
+                        if (opt.sizeBytes == null &&
+                            (opt.market == Market.GOOGLE_PLAY || opt.market == Market.APKPURE)
+                        )
+                            opt.copy(
+                                sizeBytes = gpOption?.sizeBytes,
+                                versionName = opt.versionName ?: gpOption?.versionName
+                            )
+                        else opt
+                    }
                 )
             }
         }
-    }
 
-    /** Кэш пула кандидатов для поиска по иконке. */
-    private var iconPoolCache: List<StoreApp> = emptyList()
-
-    /**
-     * Наполняет базу сравнения: прогоняет популярные категории-запросы
-     * по всем маркетам параллельно, собирая несколько сотен приложений
-     * с иконками. Кэшируется на время жизни ViewModel.
-     */
-    private suspend fun buildIconSearchPool(): List<StoreApp> {
-        if (iconPoolCache.isNotEmpty()) return iconPoolCache
-        val seeds = listOf(
-            "telegram", "whatsapp", "vpn", "браузер", "музыка",
-            "игры", "банк", "карты", "видео", "фото"
-        )
-        val markets = setOf(Market.GOOGLE_PLAY, Market.RUSTORE, Market.APKPURE)
-        val results = coroutineScope {
-            seeds.map { seed ->
-                async {
-                    runCatching { catalog.search(seed, markets) }.getOrDefault(emptyList())
-                }
-            }.awaitAll()
-        }.flatten().distinctBy { it.id }
-        iconPoolCache = results
-        return results
-    }
-
-    fun openApp(app: StoreApp) {
-        _selectedApp.value = app
-        // Лениво проверяем витрины (Google Play / App Store / GetApps):
-        // добавляем только те, где приложение реально существует.
-        viewModelScope.launch {
-            val verified = runCatching { StorefrontLinks.verifiedOptionsFor(app) }
-                .getOrDefault(emptyList())
-            if (verified.isNotEmpty()) {
-                _selectedApp.update { current ->
-                    if (current?.id == app.id)
-                        current.copy(
-                            options = (current.options + verified).distinctBy { it.market }
-                        )
-                    else current
-                }
+        val rustoreOpt = result.options.firstOrNull { it.market == Market.RUSTORE }
+        if (rustoreOpt != null && (rustoreOpt.sizeBytes == null || rustoreOpt.versionName == null)) {
+            runCatching { RustoreSource.fetchDetails(pkg) }.getOrNull()?.let { (size, version) ->
+                result = result.copy(
+                    options = result.options.map { opt ->
+                        if (opt.market == Market.RUSTORE)
+                            opt.copy(
+                                sizeBytes = opt.sizeBytes ?: size,
+                                versionName = opt.versionName ?: version
+                            )
+                        else opt
+                    }
+                )
             }
         }
+        return result
     }
 
     fun closeApp() { _selectedApp.value = null }
